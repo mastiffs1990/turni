@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<title>Turni</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}
+body{margin:0}.app{max-width:900px;margin:auto;padding:18px 14px 80px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}
+h1{font-size:25px;margin:0}.card{background:white;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0000000d}
+input,select,button{font:inherit}.file{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;background:#fff}
+select,input[type=date]{padding:10px;border:1px solid #d1d5db;border-radius:10px;width:100%;box-sizing:border-box}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.shift{border-left:5px solid #111827;padding:12px;border-radius:12px;background:#f9fafb;margin:9px 0}
+.date{font-weight:700}.loc{font-size:17px;margin-top:4px}.time{font-size:22px;font-weight:800}
+button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#fff;cursor:pointer}
+.secondary{background:#e5e7eb;color:#111827}.small{font-size:13px;color:#6b7280}
+@media(max-width:600px){.grid{grid-template-columns:1fr}h1{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><h1>📅 I miei turni</h1><button id="install" class="secondary" hidden>Installa</button></header>
+<div class="card">
+  <b>1. Carica l'Excel</b>
+  <input id="file" class="file" type="file" accept=".xlsx,.xlsm">
+  <p class="small">Il file viene elaborato nel browser: non viene inviato a un server.</p>
+</div>
+<div id="controls" class="card" hidden>
+  <div class="grid">
+    <label>Persona<select id="person"></select></label>
+    <label>Location<select id="location"><option>Tutte</option></select></label>
+    <label>Da<input id="from" type="date"></label>
+    <label>A<input id="to" type="date"></label>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <button id="ics">⬇️ Calendario (.ics)</button>
+  </div>
+</div>
+<div id="results"></div>
+</div>
+<script>
+const MONTHS={gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12,gen:1,feb:2,mar:3,apr:4,mag:5,giu:6,lug:7,ago:8,set:9,ott:10,nov:11,dic:12};
+let wb, allRows=[];
+
+function rgb(cell){
+  const fg=cell?.s?.fgColor;
+  if(!fg) return "none";
+  if(fg.rgb) return fg.rgb.toUpperCase();
+  if(fg.indexed!=null) return "indexed:"+fg.indexed;
+  if(fg.theme!=null) return "theme:"+fg.theme;
+  return "none";
+}
+function isYellow(c){return rgb(c)==="FFFFFF00"}
+function dateFrom(v){
+  if(v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(),v.getMonth(),v.getDate());
+  if(typeof v==="number"){
+    const d=XLSX.SSF.parse_date_code(v); if(d) return new Date(d.y,d.m-1,d.d);
+  }
+  const s=String(v??"").trim().toLowerCase();
+  let m=s.match(/(\\d{1,2})\\s+([a-zàèéìòù]+)/);
+  if(!m)return null; const mo=MONTHS[m[2]]; return mo?new Date(2026,mo-1,+m[1]):null;
+}
+function keyDate(d){return d.toISOString().slice(0,10)}
+function fmtDate(d){return new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
+function parseHour(v){return Number(v)}
+function locationRows(ws){
+  const out=[];
+  for(let r=0;r<ws.length;r++){
+    const v=ws[r][0]?.v;
+    if(typeof v!=="string"||!v.trim())continue;
+    const cell=ws[r][0];
+    if(isYellow(cell))continue;
+    if(v.trim().toUpperCase()===v.trim()) out.push({r,name:v.trim(),color:rgb(cell)});
+  }
+  return out;
+}
+function dayBlocks(ws){
+  const out=[]; let c=1;
+  // Workbook has merged day headers. XLSX exposes the merges.
+  for(const m of (ws['!merges']||[])){
+    if(m.s.r===0 && m.e.r===0 && m.s.c>=1){
+      const d=dateFrom(ws[m.s.r===0?XLSX.utils.encode_cell({r:0,c:m.s.c}):"A1"]?.v);
+      if(d) out.push({sc:m.s.c,ec:m.e.c,date:d});
+    }
+  }
+  return out.sort((a,b)=>a.sc-b.sc);
+}
+function cell(ws,r,c){return ws[XLSX.utils.encode_cell({r,c})]||{}}
+function nearestLocation(locs,r){let x=locs.filter(a=>a.r<r);return x.length?x[x.length-1]:null}
+function extract(){
+  allRows=[]; const colorMap={};
+  // Build workbook-wide color -> location mapping.
+  for(const name of wb.SheetNames){
+    const ws=wb.Sheets[name], aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const locs=locationRows(aoa);
+    for(const l of locs){colorMap[l.color]??={};colorMap[l.color][l.name]=(colorMap[l.color][l.name]||0)+1}
+  }
+  const globalColor={};
+  for(const [color,names] of Object.entries(colorMap))
+    globalColor[color]=Object.entries(names).sort((a,b)=>b[1]-a[1])[0]?.[0];
+
+  for(const name of wb.SheetNames){
+    const ws=wb.Sheets[name], aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const locs=locationRows(aoa);
+    const blocks=dayBlocks(ws);
+    for(let r=0;r<aoa.length;r++){
+      const person=aoa[r][0]; if(typeof person!=="string"||!isYellow(cell(ws,r,0)))continue;
+      for(const b of blocks){
+        let xs=[];
+        for(let c=b.sc;c<=b.ec;c++) if(String(aoa[r][c]??"").trim().toLowerCase()==="x") xs.push(c);
+        if(!xs.length)continue;
+        let groups=[[xs[0]]];
+        for(let i=1;i<xs.length;i++){if(xs[i]===xs[i-1]+1)groups.at(-1).push(xs[i]);else groups.push([xs[i]])}
+        for(const g of groups){
+          let seg=[g[0]], loc=null;
+          const getLoc=c=>{
+            const x=cell(ws,r,c), col=rgb(x);
+            if(col==="none"||col==="00000000") return nearestLocation(locs,r)?.name||null;
+            return locs.find(z=>z.color===col)?.name||globalColor[col]||null;
+          };
+          loc=getLoc(g[0]);
+          for(let i=1;i<g.length;i++){let l=getLoc(g[i]);if(l===loc)seg.push(g[i]);else{push(seg,loc,b,name,aoa,r);seg=[g[i]];loc=l}}
+          push(seg,loc,b,name,aoa,r);
+        }
+      }
+    }
+  }
+  // Dedicated "domeniche" sheet wins for Sundays when it has entries.
+  const dedicated=new Set(allRows.filter(x=>x.sheet.toLowerCase()==="domeniche"&&x.date.getDay()===0).map(x=>keyDate(x.date)));
+  allRows=allRows.filter(x=>!(x.date.getDay()===0&&dedicated.has(keyDate(x.date))&&x.sheet.toLowerCase()!=="domeniche"));
+  const seen=new Set(); allRows=allRows.filter(x=>{const k=[x.person,keyDate(x.date),x.start,x.end,x.location].join("|");if(seen.has(k))return false;seen.add(k);return true});
+  allRows.sort((a,b)=>a.date-b.date||a.start-b.start||a.location.localeCompare(b.location));
+}
+function push(seg,loc,b,sheet,aoa,r){
+  const sh=+aoa[1][seg[0]], en=+aoa[2][seg.at(-1)];
+  allRows.push({person:aoa[r][0].trim(),date:b.date,start:sh,end:en,location:loc||"DA VERIFICARE",sheet});
+}
+function render(){
+  const person=document.getElementById("person").value, loc=document.getElementById("location").value;
+  const from=document.getElementById("from").value, to=document.getElementById("to").value;
+  let rows=allRows.filter(x=>x.person===person);
+  if(loc!=="Tutte")rows=rows.filter(x=>x.location===loc);
+  if(from)rows=rows.filter(x=>keyDate(x.date)>=from); if(to)rows=rows.filter(x=>keyDate(x.date)<=to);
+  document.getElementById("results").innerHTML=rows.length?rows.map(x=>`
+    <div class="shift"><div class="date">${fmtDate(x.date)}</div><div class="time">${String(x.start).padStart(2,"0")}:00–${String(x.end).padStart(2,"0")}:00</div><div class="loc">📍 ${x.location}</div></div>`).join(""):"<div class='card'>Nessun turno.</div>";
+}
+function setup(){
+  const people=[...new Set(allRows.map(x=>x.person))].sort((a,b)=>a.localeCompare(b));
+  const p=document.getElementById("person");p.innerHTML=people.map(x=>`<option>${x}</option>`).join("");
+  if(people.includes("Pertosa"))p.value="Pertosa";
+  const locs=[...new Set(allRows.map(x=>x.location))].sort((a,b)=>a.localeCompare(b));
+  document.getElementById("location").innerHTML="<option>Tutte</option>"+locs.map(x=>`<option>${x}</option>`).join("");
+  const dates=allRows.map(x=>keyDate(x.date)); document.getElementById("from").value=Math.min(...dates);document.getElementById("to").value=Math.max(...dates);
+  document.getElementById("controls").hidden=false;render();
+}
+document.getElementById("file").onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellStyles:true});
+  extract();setup();
+};
+["person","location","from","to"].forEach(id=>document.getElementById(id).onchange=render);
+document.getElementById("ics").onclick=()=>{
+  const person=document.getElementById("person").value;
+  const from=document.getElementById("from").value,to=document.getElementById("to").value,loc=document.getElementById("location").value;
+  const rows=allRows.filter(x=>x.person===person&&(!from||keyDate(x.date)>=from)&&(!to||keyDate(x.date)<=to)&&(loc==="Tutte"||x.location===loc));
+  const dt=d=>d.toISOString().slice(0,10).replaceAll("-","");
+  const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Turni//IT","CALSCALE:GREGORIAN"];
+  rows.forEach((x,i)=>{const s=new Date(x.date);s.setHours(x.start);const e=new Date(x.date);e.setHours(x.end);const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\\.\\d{3}Z$/,"Z");lines.push("BEGIN:VEVENT",`UID:turno-${dt(x.date)}-${x.start}-${x.location}-${i}@turni`,`DTSTAMP:${stamp}`,`DTSTART;TZID=Europe/Rome:${dt(x.date)}T${String(x.start).padStart(2,"0")}0000`,`DTEND;TZID=Europe/Rome:${dt(x.date)}T${String(x.end).padStart(2,"0")}0000`,`SUMMARY:${x.location} – Turno`, `LOCATION:${x.location}`,"END:VEVENT")});
+  lines.push("END:VCALENDAR");
+  const blob=new Blob([lines.join("\\r\\n")],{type:"text/calendar"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`turni_${person}.ics`;a.click();URL.revokeObjectURL(a.href);
+};
+let deferred;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;document.getElementById("install").hidden=false});
+document.getElementById("install").onclick=async()=>{if(deferred){deferred.prompt();deferred=null}};
+</script>
+</body>
+</html>
