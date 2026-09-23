@@ -26,7 +26,7 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </head>
 <body>
 <div class="app">
-<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v8.0.0</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
+<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v9.0.0</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
 
 <div class="card">
   <b>Aggiorna turni</b>
@@ -48,7 +48,7 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </div>
 
 <script>
-const DB="turni-db-v5", STORE="shifts", YEAR=2026;
+const DB="turni-db-v6", STORE="shifts", YEAR=2026;
 let allRows=[];
 
 function idb(){
@@ -125,13 +125,84 @@ function getDayBlocks(ws){
  }
  return starts.map((s,i)=>({start:s.col,end:(starts[i+1]?.col||ws.columnCount+1)-1,date:s.date}));
 }
+function cellColorKey(cell){
+ const f=cell?.fill;
+ if(!f || f.type!=="pattern") return "none";
+ const c=f.fgColor||{};
+ if(c.type==="rgb"){
+   const v=(c.argb||c.rgb||"").toString().toUpperCase();
+   return v ? "rgb:"+v : "none";
+ }
+ if(c.type==="theme" && c.theme!=null) return "theme:"+c.theme+":"+Number(c.tint||0).toFixed(6);
+ if(c.type==="indexed" && c.indexed!=null) return "indexed:"+c.indexed;
+ return "none";
+}
+function isYellow(cell){
+ const k=cellColorKey(cell);
+ return k==="rgb:FFFFFF00" || k==="rgb:FFFF00";
+}
+function isDefaultFill(cell){
+ const k=cellColorKey(cell);
+ return k==="none" || k==="rgb:00000000" || k.startsWith("theme:0:");
+}
+function isX(v){return String(v??"").trim().toLowerCase()==="x"}
+
+function parseDate(v){
+ if(v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(),v.getMonth(),v.getDate());
+ if(typeof v==="number"){
+   const d=new Date(Math.round((v-25569)*86400*1000));
+   return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
+ }
+ const s=String(v??"").trim().toLowerCase();
+ const months={gennaio:0,febbraio:1,marzo:2,aprile:3,maggio:4,giugno:5,luglio:6,agosto:7,settembre:8,ottobre:9,novembre:10,dicembre:11};
+ const m=s.match(/(\d{1,2})\s+([a-zàèéìòù]+)/);
+ if(m && months[m[2]]!==undefined)return new Date(YEAR,months[m[2]],+m[1]);
+ return null;
+}
+function normalizeDate(v){
+ if(v instanceof Date && !Number.isNaN(v.getTime())) return v;
+ if(v && typeof v === "object"){
+   if(v.result!==undefined) return normalizeDate(v.result);
+   if(v.text!==undefined) return normalizeDate(v.text);
+   if(v.richText) return normalizeDate(v.richText.map(x=>x.text||"").join(""));
+ }
+ const d=new Date(v);
+ if(!Number.isNaN(d.getTime())) return d;
+ const p=parseDate(v);
+ if(p) return p;
+ return new Date(NaN);
+}
+function keyDate(v){const d=normalizeDate(v); if(Number.isNaN(d.getTime())) return ""; return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")}
+function dayOf(v){const d=normalizeDate(v); return Number.isNaN(d.getTime()) ? -1 : d.getDay()}
+function fmtDate(d){return new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(normalizeDate(d))}
+
+function getDayBlocks(ws){
+ const starts=[];
+ for(let c=2;c<=ws.columnCount;c++){
+   const v=ws.getCell(1,c).value;
+   if(v!==null && v!==undefined && String(v).trim()!==""){
+     const d=parseDate(v);
+     if(d)starts.push({col:c,date:d});
+   }
+ }
+ return starts.map((s,i)=>({start:s.col,end:(starts[i+1]?.col||ws.columnCount+1)-1,date:s.date}));
+}
 function locationRows(ws){
+ // In this workbook employee names, including Pertosa, have the same yellow fill.
+ // Use Pertosa's actual fill signature on each sheet so yellow employee rows can
+ // never be mistaken for a location (important on the domeniche sheet).
+ const pertosaColors=new Set();
+ for(let r=1;r<=ws.rowCount;r++){
+   const v=ws.getCell(r,1).value;
+   if(typeof v==="string" && v.trim().toLowerCase()==="pertosa") pertosaColors.add(cellColorKey(ws.getCell(r,1)));
+ }
  const a=[];
  for(let r=1;r<=ws.rowCount;r++){
    const cell=ws.getCell(r,1), v=cell.value;
-   if(typeof v!=="string" || !v.trim() || isYellow(cell))continue;
-   const name=v.trim();
-   if(name===name.toUpperCase())a.push({row:r,name,color:rgb(cell.fill)});
+   if(typeof v!=="string" || !v.trim())continue;
+   const name=v.trim(), color=cellColorKey(cell);
+   if(pertosaColors.has(color) || isYellow(cell))continue;
+   if(name===name.toUpperCase())a.push({row:r,name,color});
  }
  return a;
 }
@@ -155,41 +226,38 @@ function parseWorkbook(wb){
    for(let r=1;r<=ws.rowCount;r++){
      const personCell=ws.getCell(r,1), person=personCell.value;
      if(typeof person!=="string" || !person.trim())continue;
-     // Employee rows are text names in column A. We do not rely on the yellow fill here:
-     // ExcelJS can expose theme/indexed fills differently depending on the workbook.
-     // Location rows are handled separately below.
      for(const b of blocks){
        const xs=[];
        for(let c=b.start;c<=b.end;c++)if(isX(ws.getCell(r,c).value))xs.push(c);
        if(!xs.length)continue;
-       const groups=[[xs[0]]];
+
+       // A contiguous run of default-colour X cells is ONE shift. This is the
+       // normal case (e.g. 07:00-13:00), so do not split it hour by hour.
+       const runs=[];
+       let current=[xs[0]];
+       let currentColor=cellColorKey(ws.getCell(r,xs[0]));
        for(let i=1;i<xs.length;i++){
-         if(xs[i]===xs[i-1]+1)groups.at(-1).push(xs[i]); else groups.push([xs[i]]);
+         const c=xs[i], color=cellColorKey(ws.getCell(r,c));
+         const contiguous=c===xs[i-1]+1;
+         const split=contiguous && !isDefaultFill(ws.getCell(r,xs[i-1])) && color!==currentColor;
+         if(!contiguous || split){runs.push(current);current=[c];currentColor=color;}
+         else current.push(c);
        }
-       for(const group of groups){
-         let segment=[group[0]];
-         const getLoc=c=>{
-           const x=ws.getCell(r,c), col=rgb(x.fill);
-           if(isDefaultX(x)) return nearestPrevious(locs,r)?.name || null;
-           return locs.find(z=>z.color===col)?.name || global[col] || null;
-         };
-         let loc=getLoc(group[0]);
-         for(let i=1;i<group.length;i++){
-           const next=getLoc(group[i]);
-           if(next===loc)segment.push(group[i]);
-           else{
-             addSegment(rows,ws,r,person,b,segment,loc);
-             segment=[group[i]];loc=next;
-           }
-         }
+       runs.push(current);
+
+       for(const segment of runs){
+         const first=ws.getCell(r,segment[0]);
+         const color=cellColorKey(first);
+         let loc;
+         if(isDefaultFill(first)) loc=nearestPrevious(locs,r)?.name || null;
+         else loc=locs.find(z=>z.color===color)?.name || global[color] || null;
          addSegment(rows,ws,r,person,b,segment,loc);
        }
      }
    }
  }
- // For Sundays, the dedicated "domeniche" sheet is authoritative.
- const sundayDates=new Set(rows.filter(x=>x.sheet.toLowerCase()==="domeniche"&&dayOf(x.date)===0).map(x=>keyDate(normalizeDate(x.date))));
- let result=rows.filter(x=>!(dayOf(x.date)===0&&sundayDates.has(keyDate(normalizeDate(x.date)))&&x.sheet.toLowerCase()!=="domeniche"));
+ const sundayDates=new Set(rows.filter(x=>x.sheet.toLowerCase()==="domeniche"&&dayOf(x.date)===0).map(x=>keyDate(x.date)));
+ let result=rows.filter(x=>!(dayOf(x.date)===0&&sundayDates.has(keyDate(x.date))&&x.sheet.toLowerCase()!=="domeniche"));
  const seen=new Set();
  result=result.filter(x=>{const k=[x.person,keyDate(x.date),x.start,x.end,x.location].join("|");if(seen.has(k))return false;seen.add(k);return true});
  result.sort((a,b)=>normalizeDate(a.date)-normalizeDate(b.date)||a.start-b.start||a.location.localeCompare(b.location));
