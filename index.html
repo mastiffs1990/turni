@@ -1,180 +1,84 @@
 <!doctype html>
 <html lang="it">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#111827">
-<link rel="manifest" href="manifest.json">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg">
 <title>Turni</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}
-body{margin:0}.app{max-width:900px;margin:auto;padding:18px 14px 80px}
-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}
-h1{font-size:25px;margin:0}.card{background:white;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0000000d}
-input,select,button{font:inherit}.file{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;background:#fff}
-select,input[type=date]{padding:10px;border:1px solid #d1d5db;border-radius:10px;width:100%;box-sizing:border-box}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.shift{border-left:5px solid #111827;padding:12px;border-radius:12px;background:#f9fafb;margin:9px 0}
-.date{font-weight:700}.loc{font-size:17px;margin-top:4px}.time{font-size:22px;font-weight:800}
-button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#fff;cursor:pointer}
-.secondary{background:#e5e7eb;color:#111827}.small{font-size:13px;color:#6b7280}
-@media(max-width:600px){.grid{grid-template-columns:1fr}h1{font-size:22px}}
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}*{box-sizing:border-box}body{margin:0}.app{max-width:900px;margin:auto;padding:18px 14px 60px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}h1{font-size:25px;margin:0}.card{background:#fff;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0000000d}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:13px;color:#4b5563}select,input[type=file],input[type=date]{display:block;width:100%;margin-top:5px;padding:11px;border:1px solid #d1d5db;border-radius:11px;background:#fff;font:inherit;color:#111827}.button{display:inline-block;border:0;border-radius:11px;padding:11px 14px;background:#111827;color:#fff;font:inherit;cursor:pointer}.button.secondary{background:#e5e7eb;color:#111827}.small{font-size:13px;color:#6b7280}.status{padding:10px 12px;border-radius:10px;background:#f3f4f6;font-size:13px}.status.ok{background:#ecfdf5;color:#065f46}.status.err{background:#fef2f2;color:#991b1b}.shift{background:#fff;border-radius:16px;padding:14px 15px;margin:9px 0;box-shadow:0 2px 9px #0000000a;border-left:5px solid #111827}.date{font-weight:750}.time{font-size:23px;font-weight:800;margin-top:2px}.loc{font-size:17px;margin-top:3px}.empty{padding:25px;text-align:center;color:#6b7280}.hidden{display:none!important}.top-actions{display:flex;gap:8px;flex-wrap:wrap}.badge{font-size:12px;background:#e5e7eb;padding:5px 8px;border-radius:999px}@media(max-width:620px){.grid{grid-template-columns:1fr}h1{font-size:22px}}
 </style>
 </head>
 <body>
 <div class="app">
-<header><h1>📅 I miei turni</h1><button id="install" class="secondary" hidden>Installa</button></header>
-<div class="card">
-  <b>1. Carica l'Excel</b>
-  <input id="file" class="file" type="file" accept=".xlsx,.xlsm">
-  <p class="small">Il file viene elaborato nel browser: non viene inviato a un server.</p>
+<header><div><h1>📅 I miei turni</h1><div class="small" id="lastSaved"></div></div><button id="installBtn" class="button secondary hidden">Installa</button></header>
+<div class="card" id="uploadCard">
+<strong>Aggiorna turni</strong>
+<p class="small">La prima volta carica l'Excel. Dopo il salvataggio, quando riapri l'app i turni restano disponibili senza ricaricare il file.</p>
+<input id="file" type="file" accept=".xlsx,.xlsm">
+<div id="status" class="status" style="margin-top:10px">Nessun file caricato in questa sessione.</div>
 </div>
-<div id="controls" class="card" hidden>
-  <div class="grid">
-    <label>Persona<select id="person"></select></label>
-    <label>Location<select id="location"><option>Tutte</option></select></label>
-    <label>Da<input id="from" type="date"></label>
-    <label>A<input id="to" type="date"></label>
-  </div>
-  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-    <button id="ics">⬇️ Calendario (.ics)</button>
-  </div>
+<div id="controls" class="card hidden">
+<div class="grid">
+<label>Persona<select id="person"></select></label>
+<label>Location<select id="location"><option>Tutte</option></select></label>
+<label>Da<input id="from" type="date"></label>
+<label>A<input id="to" type="date"></label>
 </div>
+<div class="top-actions" style="margin-top:12px"><button id="today" class="button secondary">Oggi</button><button id="reload" class="button secondary">Ricarica dati salvati</button><button id="clear" class="button secondary">Cancella dati locali</button></div>
+</div>
+<div id="summary" class="card hidden"></div>
 <div id="results"></div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
-const MONTHS={gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12,gen:1,feb:2,mar:3,apr:4,mag:5,giu:6,lug:7,ago:8,set:9,ott:10,nov:11,dic:12};
-let wb, allRows=[];
-
-function rgb(cell){
-  const fg=cell?.s?.fgColor;
-  if(!fg) return "none";
-  if(fg.rgb) return fg.rgb.toUpperCase();
-  if(fg.indexed!=null) return "indexed:"+fg.indexed;
-  if(fg.theme!=null) return "theme:"+fg.theme;
-  return "none";
-}
-function isYellow(c){return rgb(c)==="FFFFFF00"}
-function dateFrom(v){
-  if(v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(),v.getMonth(),v.getDate());
-  if(typeof v==="number"){
-    const d=XLSX.SSF.parse_date_code(v); if(d) return new Date(d.y,d.m-1,d.d);
-  }
-  const s=String(v??"").trim().toLowerCase();
-  let m=s.match(/(\\d{1,2})\\s+([a-zàèéìòù]+)/);
-  if(!m)return null; const mo=MONTHS[m[2]]; return mo?new Date(2026,mo-1,+m[1]):null;
-}
-function keyDate(d){return d.toISOString().slice(0,10)}
-function fmtDate(d){return new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
-function parseHour(v){return Number(v)}
-function locationRows(ws){
-  const out=[];
-  for(let r=0;r<ws.length;r++){
-    const v=ws[r][0]?.v;
-    if(typeof v!=="string"||!v.trim())continue;
-    const cell=ws[r][0];
-    if(isYellow(cell))continue;
-    if(v.trim().toUpperCase()===v.trim()) out.push({r,name:v.trim(),color:rgb(cell)});
-  }
-  return out;
-}
-function dayBlocks(ws){
-  const out=[]; let c=1;
-  // Workbook has merged day headers. XLSX exposes the merges.
-  for(const m of (ws['!merges']||[])){
-    if(m.s.r===0 && m.e.r===0 && m.s.c>=1){
-      const d=dateFrom(ws[m.s.r===0?XLSX.utils.encode_cell({r:0,c:m.s.c}):"A1"]?.v);
-      if(d) out.push({sc:m.s.c,ec:m.e.c,date:d});
-    }
-  }
-  return out.sort((a,b)=>a.sc-b.sc);
-}
-function cell(ws,r,c){return ws[XLSX.utils.encode_cell({r,c})]||{}}
+const DB_NAME='turni-pwa-db', DB_VERSION=1, STORE='data';
+let allRows=[], db=null, deferredPrompt=null;
+const months={gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12,gen:1,feb:2,mar:3,apr:4,mag:5,giu:6,lug:7,ago:8,set:9,ott:10,nov:11,dic:12};
+const weekdays=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>{db=r.result;res(db)};r.onerror=()=>rej(r.error)})}
+function saveRows(rows){return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put({rows, savedAt:new Date().toISOString()},'turni');tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
+function loadRows(){return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get('turni');r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})}
+function clearRows(){return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete('turni');tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
+function excelText(v){if(v==null)return '';if(typeof v==='object'&&v.richText)return v.richText.map(x=>x.text).join('');return String(v)}
+function fillKey(cell){const f=cell?.fill;if(!f||f.type!=='pattern'||f.pattern!=='solid')return 'none';const fg=f.fgColor||{};if(fg.type==='argb')return String(fg.argb||'').toUpperCase();if(fg.type==='rgb')return String(fg.rgb||'').toUpperCase();if(fg.type==='theme')return 'theme:'+fg.theme;return fg.type+':'+String(fg.indexed??'')}
+function isYellow(cell){return fillKey(cell)==='FFFFFF00'||fillKey(cell)==='FFFF00'}
+function dateFrom(v){if(v instanceof Date&&!isNaN(v))return new Date(v.getFullYear(),v.getMonth(),v.getDate());const s=excelText(v).trim().toLowerCase();const m=s.match(/(\d{1,2})\s+([a-zàèéìòù]+)/);if(!m)return null;const mo=months[m[2]];if(!mo)return null;return new Date(2026,mo-1,+m[1])}
+function dayBlocks(ws){const out=[];let starts=[];for(let c=2;c<=ws.columnCount;c++){const d=dateFrom(ws.getRow(1).getCell(c).value);if(d)starts.push({c,d})}for(let i=0;i<starts.length;i++)out.push({sc:starts[i].c,ec:(starts[i+1]?.c||ws.columnCount+1)-1,date:starts[i].d});return out}
+function locationRows(ws){const out=[];for(let r=1;r<=ws.rowCount;r++){const cell=ws.getRow(r).getCell(1),v=excelText(cell.value).trim();if(!v||isYellow(cell))continue;if(v.toUpperCase()===v)out.push({r,name:v,color:fillKey(cell)})}return out}
 function nearestLocation(locs,r){let x=locs.filter(a=>a.r<r);return x.length?x[x.length-1]:null}
-function extract(){
-  allRows=[]; const colorMap={};
-  // Build workbook-wide color -> location mapping.
-  for(const name of wb.SheetNames){
-    const ws=wb.Sheets[name], aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-    const locs=locationRows(aoa);
-    for(const l of locs){colorMap[l.color]??={};colorMap[l.color][l.name]=(colorMap[l.color][l.name]||0)+1}
+function isX(cell){return excelText(cell.value).trim().toLowerCase()==='x'}
+function defaultX(cell){const k=fillKey(cell);return k==='none'||k==='00000000'||k==='FFFFFFFF'}
+async function parseWorkbook(file){
+ const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
+ const colorMap={};
+ for(const ws of wb.worksheets){for(const l of locationRows(ws)){colorMap[l.color]??={};colorMap[l.color][l.name]=(colorMap[l.color][l.name]||0)+1}}
+ const globalColor={};for(const [c,n] of Object.entries(colorMap))globalColor[c]=Object.entries(n).sort((a,b)=>b[1]-a[1])[0][0];
+ const rows=[];
+ for(const ws of wb.worksheets){const locs=locationRows(ws), blocks=dayBlocks(ws);for(let r=1;r<=ws.rowCount;r++){
+  const pc=ws.getRow(r).getCell(1), person=excelText(pc.value).trim();if(!person||!isYellow(pc))continue;
+  for(const b of blocks){let xs=[];for(let c=b.sc;c<=b.ec;c++)if(isX(ws.getRow(r).getCell(c)))xs.push(c);if(!xs.length)continue;
+   const groups=[];let g=[xs[0]];for(let i=1;i<xs.length;i++){if(xs[i]===xs[i-1]+1)g.push(xs[i]);else{groups.push(g);g=[xs[i]]}}groups.push(g);
+   for(const group of groups){let seg=[group[0]],loc=null;const getLoc=c=>{const cell=ws.getRow(r).getCell(c),k=fillKey(cell);if(defaultX(cell))return nearestLocation(locs,r)?.name||null;return locs.find(z=>z.color===k)?.name||globalColor[k]||null};loc=getLoc(group[0]);for(let i=1;i<group.length;i++){const l=getLoc(group[i]);if(l===loc)seg.push(group[i]);else{add(seg,loc,b,ws.name,ws,r);seg=[group[i]];loc=l}}add(seg,loc,b,ws.name,ws,r);
+   }
   }
-  const globalColor={};
-  for(const [color,names] of Object.entries(colorMap))
-    globalColor[color]=Object.entries(names).sort((a,b)=>b[1]-a[1])[0]?.[0];
-
-  for(const name of wb.SheetNames){
-    const ws=wb.Sheets[name], aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-    const locs=locationRows(aoa);
-    const blocks=dayBlocks(ws);
-    for(let r=0;r<aoa.length;r++){
-      const person=aoa[r][0]; if(typeof person!=="string"||!isYellow(cell(ws,r,0)))continue;
-      for(const b of blocks){
-        let xs=[];
-        for(let c=b.sc;c<=b.ec;c++) if(String(aoa[r][c]??"").trim().toLowerCase()==="x") xs.push(c);
-        if(!xs.length)continue;
-        let groups=[[xs[0]]];
-        for(let i=1;i<xs.length;i++){if(xs[i]===xs[i-1]+1)groups.at(-1).push(xs[i]);else groups.push([xs[i]])}
-        for(const g of groups){
-          let seg=[g[0]], loc=null;
-          const getLoc=c=>{
-            const x=cell(ws,r,c), col=rgb(x);
-            if(col==="none"||col==="00000000") return nearestLocation(locs,r)?.name||null;
-            return locs.find(z=>z.color===col)?.name||globalColor[col]||null;
-          };
-          loc=getLoc(g[0]);
-          for(let i=1;i<g.length;i++){let l=getLoc(g[i]);if(l===loc)seg.push(g[i]);else{push(seg,loc,b,name,aoa,r);seg=[g[i]];loc=l}}
-          push(seg,loc,b,name,aoa,r);
-        }
-      }
-    }
-  }
-  // Dedicated "domeniche" sheet wins for Sundays when it has entries.
-  const dedicated=new Set(allRows.filter(x=>x.sheet.toLowerCase()==="domeniche"&&x.date.getDay()===0).map(x=>keyDate(x.date)));
-  allRows=allRows.filter(x=>!(x.date.getDay()===0&&dedicated.has(keyDate(x.date))&&x.sheet.toLowerCase()!=="domeniche"));
-  const seen=new Set(); allRows=allRows.filter(x=>{const k=[x.person,keyDate(x.date),x.start,x.end,x.location].join("|");if(seen.has(k))return false;seen.add(k);return true});
-  allRows.sort((a,b)=>a.date-b.date||a.start-b.start||a.location.localeCompare(b.location));
+ }}
+ // The dedicated domeniche sheet is authoritative for Sundays and removes duplicates from weekly sheets.
+ const dedicated=new Set(rows.filter(x=>x.sheet.toLowerCase()==='domeniche'&&x.date.getDay()===0).map(x=>keyDate(x.date)));
+ let filtered=rows.filter(x=>!(x.date.getDay()===0&&dedicated.has(keyDate(x.date))&&x.sheet.toLowerCase()!=='domeniche'));
+ const seen=new Set();filtered=filtered.filter(x=>{const k=[x.person,keyDate(x.date),x.start,x.end,x.location].join('|');if(seen.has(k))return false;seen.add(k);return true});
+ filtered.sort((a,b)=>a.date-b.date||a.start-b.start||a.person.localeCompare(b.person));return filtered;
+ function add(seg,loc,b,sheet,ws,r){const start=Number(ws.getRow(2).getCell(seg[0]).value),end=Number(ws.getRow(3).getCell(seg[seg.length-1]).value);rows.push({person:excelText(ws.getRow(r).getCell(1).value).trim(),date:b.date.toISOString(),start,end,location:loc||'DA VERIFICARE',sheet})}
 }
-function push(seg,loc,b,sheet,aoa,r){
-  const sh=+aoa[1][seg[0]], en=+aoa[2][seg.at(-1)];
-  allRows.push({person:aoa[r][0].trim(),date:b.date,start:sh,end:en,location:loc||"DA VERIFICARE",sheet});
-}
-function render(){
-  const person=document.getElementById("person").value, loc=document.getElementById("location").value;
-  const from=document.getElementById("from").value, to=document.getElementById("to").value;
-  let rows=allRows.filter(x=>x.person===person);
-  if(loc!=="Tutte")rows=rows.filter(x=>x.location===loc);
-  if(from)rows=rows.filter(x=>keyDate(x.date)>=from); if(to)rows=rows.filter(x=>keyDate(x.date)<=to);
-  document.getElementById("results").innerHTML=rows.length?rows.map(x=>`
-    <div class="shift"><div class="date">${fmtDate(x.date)}</div><div class="time">${String(x.start).padStart(2,"0")}:00–${String(x.end).padStart(2,"0")}:00</div><div class="loc">📍 ${x.location}</div></div>`).join(""):"<div class='card'>Nessun turno.</div>";
-}
-function setup(){
-  const people=[...new Set(allRows.map(x=>x.person))].sort((a,b)=>a.localeCompare(b));
-  const p=document.getElementById("person");p.innerHTML=people.map(x=>`<option>${x}</option>`).join("");
-  if(people.includes("Pertosa"))p.value="Pertosa";
-  const locs=[...new Set(allRows.map(x=>x.location))].sort((a,b)=>a.localeCompare(b));
-  document.getElementById("location").innerHTML="<option>Tutte</option>"+locs.map(x=>`<option>${x}</option>`).join("");
-  const dates=allRows.map(x=>keyDate(x.date)); document.getElementById("from").value=Math.min(...dates);document.getElementById("to").value=Math.max(...dates);
-  document.getElementById("controls").hidden=false;render();
-}
-document.getElementById("file").onchange=async e=>{
-  const f=e.target.files[0];if(!f)return;
-  wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellStyles:true});
-  extract();setup();
-};
-["person","location","from","to"].forEach(id=>document.getElementById(id).onchange=render);
-document.getElementById("ics").onclick=()=>{
-  const person=document.getElementById("person").value;
-  const from=document.getElementById("from").value,to=document.getElementById("to").value,loc=document.getElementById("location").value;
-  const rows=allRows.filter(x=>x.person===person&&(!from||keyDate(x.date)>=from)&&(!to||keyDate(x.date)<=to)&&(loc==="Tutte"||x.location===loc));
-  const dt=d=>d.toISOString().slice(0,10).replaceAll("-","");
-  const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Turni//IT","CALSCALE:GREGORIAN"];
-  rows.forEach((x,i)=>{const s=new Date(x.date);s.setHours(x.start);const e=new Date(x.date);e.setHours(x.end);const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\\.\\d{3}Z$/,"Z");lines.push("BEGIN:VEVENT",`UID:turno-${dt(x.date)}-${x.start}-${x.location}-${i}@turni`,`DTSTAMP:${stamp}`,`DTSTART;TZID=Europe/Rome:${dt(x.date)}T${String(x.start).padStart(2,"0")}0000`,`DTEND;TZID=Europe/Rome:${dt(x.date)}T${String(x.end).padStart(2,"0")}0000`,`SUMMARY:${x.location} – Turno`, `LOCATION:${x.location}`,"END:VEVENT")});
-  lines.push("END:VCALENDAR");
-  const blob=new Blob([lines.join("\\r\\n")],{type:"text/calendar"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`turni_${person}.ics`;a.click();URL.revokeObjectURL(a.href);
-};
-let deferred;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;document.getElementById("install").hidden=false});
-document.getElementById("install").onclick=async()=>{if(deferred){deferred.prompt();deferred=null}};
+function keyDate(x){return new Date(x.date).toISOString().slice(0,10)}
+function dateObj(x){return new Date(x.date)}
+function fmtDate(x){const d=dateObj(x);return weekdays[d.getDay()]+' '+String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()}
+function setup(){const people=[...new Set(allRows.map(x=>x.person))].sort((a,b)=>a.localeCompare(b));const p=document.getElementById('person');p.innerHTML=people.map(x=>`<option>${esc(x)}</option>`).join('');if(people.includes('Pertosa'))p.value='Pertosa';const locs=[...new Set(allRows.map(x=>x.location))].sort((a,b)=>a.localeCompare(b));document.getElementById('location').innerHTML='<option>Tutte</option>'+locs.map(x=>`<option>${esc(x)}</option>`).join('');const dates=allRows.map(keyDate).sort();document.getElementById('from').value=dates[0];document.getElementById('to').value=dates.at(-1);document.getElementById('controls').classList.remove('hidden');render()}
+function render(){if(!allRows.length)return;const person=document.getElementById('person').value,loc=document.getElementById('location').value,from=document.getElementById('from').value,to=document.getElementById('to').value;let rows=allRows.filter(x=>x.person===person&&(!from||keyDate(x)>=from)&&(!to||keyDate(x)<=to)&&(loc==='Tutte'||x.location===loc));const today=new Date();today.setHours(0,0,0,0);const todayRows=rows.filter(x=>keyDate(x)===today.toISOString().slice(0,10));document.getElementById('summary').classList.remove('hidden');document.getElementById('summary').innerHTML=`<strong>${esc(person)}</strong> · ${rows.length} turni nel periodo${todayRows.length?` · <span class="badge">Oggi: ${todayRows.map(x=>x.start+':00–'+x.end+':00').join(', ')}</span>`:''}`;document.getElementById('results').innerHTML=rows.length?rows.map(x=>`<div class="shift"><div class="date">${fmtDate(x)}</div><div class="time">${String(x.start).padStart(2,'0')}:00–${String(x.end).padStart(2,'0')}:00</div><div class="loc">📍 ${esc(x.location)}</div></div>`).join(''):'<div class="card empty">Nessun turno nel periodo selezionato.</div>'}
+function esc(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+async function useSaved(){const d=await loadRows();if(!d||!d.rows?.length)return false;allRows=d.rows;document.getElementById('lastSaved').textContent='Dati salvati: '+new Date(d.savedAt).toLocaleString('it-IT');document.getElementById('status').textContent='Turni salvati disponibili anche senza ricaricare l’Excel.';document.getElementById('status').className='status ok';setup();return true}
+document.getElementById('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;const st=document.getElementById('status');st.textContent='Sto leggendo l’Excel…';st.className='status';try{allRows=await parseWorkbook(f);if(!allRows.length)throw new Error('Non ho trovato turni. Controlla la struttura del file.');await saveRows(allRows);document.getElementById('lastSaved').textContent='Dati salvati: '+new Date().toLocaleString('it-IT');st.textContent=`Importazione completata: ${allRows.length} turni salvati sul dispositivo.`;st.className='status ok';setup()}catch(err){console.error(err);st.textContent='Errore: '+err.message;st.className='status err'}};
+['person','location','from','to'].forEach(id=>document.getElementById(id).onchange=render);document.getElementById('today').onclick=()=>{const d=new Date().toISOString().slice(0,10);document.getElementById('from').value=d;document.getElementById('to').value=d;render()};document.getElementById('reload').onclick=useSaved;document.getElementById('clear').onclick=async()=>{if(confirm('Cancellare i turni salvati su questo dispositivo?')){await clearRows();allRows=[];document.getElementById('controls').classList.add('hidden');document.getElementById('summary').classList.add('hidden');document.getElementById('results').innerHTML='';document.getElementById('lastSaved').textContent=''}};
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBtn').classList.remove('hidden')});document.getElementById('installBtn').onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null}};
+(async()=>{await openDB();await useSaved();})();
 </script>
-</body>
-</html>
+</body></html>
