@@ -1,5 +1,3 @@
-# Turni PWA v10.0.0
-
-Parser Excel locale per Pertosa. Include versione visibile nell'interfaccia e cache Service Worker v10.
-
-Testare prima localmente caricando lo stesso file Excel. Non serve il deploy finché il parser non è confermato.
+Turni PWA v11.0.0
+Test locale prima del deploy.
+Parser: Pertosa, X consecutive come unico turno, location da colore/ultima location precedente, domeniche autorevoli.
