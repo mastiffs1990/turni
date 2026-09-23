@@ -26,7 +26,7 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </head>
 <body>
 <div class="app">
-<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v11.0.0</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
+<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v12.0.0</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
 
 <div class="card">
   <b>Aggiorna turni</b>
@@ -48,7 +48,7 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </div>
 
 <script>
-const DB="turni-db-v11", STORE="shifts", YEAR=2026;
+const DB="turni-db-v12", STORE="shifts", YEAR=2026;
 let allRows=[];
 
 function idb(){
@@ -148,18 +148,21 @@ function buildGlobalColorMap(wb){
  return out;
 }
 function getLocationForSegment(ws,locs,global,personRow,segment){
+ // Regola robusta: il colore di una X conta SOLO se coincide con il colore
+ // di una location realmente presente in colonna A. Qualsiasi altro riempimento
+ // (theme 0, none, rgb:00000000, ecc.) viene trattato come X normale.
  const first=ws.getCell(personRow,segment[0]);
  const ck=colorKey(first);
- if(isDefaultFill(first)) return nearestLocationBefore(locs,personRow)?.name || null;
- // Se le X sono colorate, il colore identifica la location.
  const local=locs.find(x=>x.color===ck);
- if(local)return local.name;
- return global.get(ck)||null;
+ if(local) return local.name;
+ const mapped=global.get(ck);
+ if(mapped) return mapped;
+ return nearestLocationBefore(locs,personRow)?.name || null;
 }
 function addSegment(rows,ws,r,person,b,segment,loc){
  const start=Number(ws.getCell(2,segment[0]).value);
  const end=Number(ws.getCell(3,segment[segment.length-1]).value);
- if(!Number.isFinite(start)||!Number.isFinite(end))return;
+ if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
  rows.push({id:crypto.randomUUID(),person:person.trim(),date:b.date.toISOString(),start,end,location:loc||"DA VERIFICARE",sheet:ws.name});
 }
 function parseWorkbook(wb){

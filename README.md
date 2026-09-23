@@ -1,3 +1,3 @@
-Turni PWA v11.0.0
-Test locale prima del deploy.
-Parser: Pertosa, X consecutive come unico turno, location da colore/ultima location precedente, domeniche autorevoli.
+Turni PWA v12.0.0
+
+Parser verificato sul file Excel fornito. Estrae solo Pertosa, raggruppa X consecutive in un turno, usa la location precedente per le X normali e il colore della location per le X colorate (CASALUCE). La scheda domeniche è autorevole per le domeniche.
