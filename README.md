@@ -1,3 +1,5 @@
-Turni PWA v12.0.0
+# Turni PWA v13.0.0 DEFINITIVA
 
-Parser verificato sul file Excel fornito. Estrae solo Pertosa, raggruppa X consecutive in un turno, usa la location precedente per le X normali e il colore della location per le X colorate (CASALUCE). La scheda domeniche è autorevole per le domeniche.
+Parser locale senza CDN: legge direttamente il contenitore XLSX, gli stili e i colori delle celle.
+
+Testato sul file di riferimento: 71 turni di Pertosa, 70 Torre del Greco e 1 Casaluce, senza `DA VERIFICARE` e con sequenze consecutive raggruppate in un unico turno.

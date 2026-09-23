@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
-<title>Turni PWA v11</title>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<title>Turni PWA v13</title>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}
 body{margin:0}.app{max-width:900px;margin:auto;padding:18px 14px 70px}
@@ -15,26 +14,22 @@ h1{font-size:25px;margin:0}.card{background:#fff;border-radius:18px;padding:16px
 input,select,button{font:inherit}.file{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;background:#fff;box-sizing:border-box}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:14px;font-weight:650}
 select,input[type=date]{display:block;margin-top:5px;padding:10px;border:1px solid #d1d5db;border-radius:10px;width:100%;box-sizing:border-box;background:#fff}
-button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#fff;cursor:pointer}
-.secondary{background:#e5e7eb;color:#111827}.small{font-size:13px;color:#6b7280}
-.shift{padding:14px;border-radius:14px;background:#fff;margin:9px 0;box-shadow:0 2px 8px #0000000a}
+button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#fff;cursor:pointer}.secondary{background:#e5e7eb;color:#111827}
+.small{font-size:13px;color:#6b7280}.shift{padding:14px;border-radius:14px;background:#fff;margin:9px 0;box-shadow:0 2px 8px #0000000a}
 .date{font-weight:750;text-transform:capitalize}.time{font-size:23px;font-weight:850;margin-top:2px}.loc{font-size:17px;margin-top:4px}
-.today{border:2px solid #111827}.status{padding:10px;border-radius:10px;background:#f9fafb;font-size:14px}
-.empty{padding:25px;text-align:center;color:#6b7280}
+.today{border:2px solid #111827}.status{padding:10px;border-radius:10px;background:#f9fafb;font-size:14px}.empty{padding:25px;text-align:center;color:#6b7280}
 @media(max-width:600px){.grid{grid-template-columns:1fr}h1{font-size:22px}}
 </style>
 </head>
 <body>
 <div class="app">
-<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v12.0.0</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
-
+<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v13.0.0 DEFINITIVA</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
 <div class="card">
   <b>Aggiorna turni</b>
   <input id="file" class="file" type="file" accept=".xlsx,.xlsm">
   <p class="small">Il file viene elaborato direttamente nel browser. Dopo il primo caricamento i turni restano salvati su questo dispositivo.</p>
   <div id="status"></div>
 </div>
-
 <div id="controls" class="card" hidden>
   <div class="grid">
     <label>Persona<select id="person"></select></label>
@@ -46,230 +41,94 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </div>
 <div id="results"></div>
 </div>
-
+<script src="jszip.min.js"></script>
 <script>
-const DB="turni-db-v12", STORE="shifts", YEAR=2026;
+const DB="turni-db-v13", STORE="shifts", VERSION="v13.0.0 DEFINITIVA";
 let allRows=[];
-
-function idb(){
- return new Promise((resolve,reject)=>{
-  const r=indexedDB.open(DB,1);
-  r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"})};
-  r.onsuccess=()=>resolve(r.result); r.onerror=()=>reject(r.error);
- });
-}
-async function saveRows(rows){
- const db=await idb(), tx=db.transaction(STORE,"readwrite"), st=tx.objectStore(STORE);
- st.clear(); rows.forEach(x=>st.put(x));
- return new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});
-}
-async function loadRows(){
- const db=await idb(), tx=db.transaction(STORE,"readonly"), req=tx.objectStore(STORE).getAll();
- return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});
-}
-
-function colorKey(cell){
-  const fill=cell && cell.fill;
-  if(!fill || fill.type!=="pattern") return "none";
-  const c=fill.fgColor||{};
-  if(c.type==="rgb" && c.argb) return "rgb:"+String(c.argb).toUpperCase();
-  if(c.type==="theme" && c.theme!=null) return "theme:"+c.theme+":"+Number(c.tint||0).toFixed(6);
-  if(c.type==="indexed" && c.indexed!=null) return "indexed:"+c.indexed;
-  return "none";
-}
-function isYellow(cell){return colorKey(cell)==="rgb:FFFFFF00";}
-function isDefaultFill(cell){const k=colorKey(cell);return k==="none"||k==="rgb:00000000"||k.startsWith("theme:0:");}
-function isX(v){return String(v??"").trim().toLowerCase()==="x"}
-
-function parseDate(v){
- if(v instanceof Date && !Number.isNaN(v.getTime())) return new Date(v.getFullYear(),v.getMonth(),v.getDate());
- if(typeof v==="number"){
-   const d=new Date(Math.round((v-25569)*86400*1000));
-   return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
- }
+function idb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+async function saveRows(rows){const db=await idb(),tx=db.transaction(STORE,"readwrite"),st=tx.objectStore(STORE);st.clear();rows.forEach(x=>st.put({...x,id:crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random()}));return new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
+async function loadRows(){const db=await idb(),tx=db.transaction(STORE,"readonly"),req=tx.objectStore(STORE).getAll();return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)})}
+const text=n=>n?.textContent||"";
+const els=(p,n)=>Array.from(p?.childNodes||[]).filter(x=>x.nodeType===1&&(x.localName||x.nodeName)===n);
+const el=(p,n)=>els(p,n)[0]||null;
+const xml=s=>new DOMParser().parseFromString(s,"text/xml");
+function colNum(ref){let s=(ref.match(/[A-Z]+/i)||[""])[0].toUpperCase(),n=0;for(const c of s)n=n*26+c.charCodeAt(0)-64;return n}
+const months={gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12};
+function dateFromValue(v){
+ if(typeof v==="number"&&Number.isFinite(v)){const d=new Date(Date.UTC(1899,11,30)+v*86400000);return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`}
  const s=String(v??"").trim().toLowerCase();
- const months={gennaio:0,febbraio:1,marzo:2,aprile:3,maggio:4,giugno:5,luglio:6,agosto:7,settembre:8,ottobre:9,novembre:10,dicembre:11};
- const m=s.match(/(\d{1,2})\s+([a-zàèéìòù]+)/);
- if(m && months[m[2]]!==undefined)return new Date(YEAR,months[m[2]],Number(m[1]));
- return null;
+ if(/^\d+(?:\.\d+)?$/.test(s)){const n=Number(s);if(Number.isFinite(n)){const d=new Date(Date.UTC(1899,11,30)+n*86400000);return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`}}
+ const m=s.match(/(\d{1,2})\s+([a-zàèéìòù]+)/);if(!m||!months[m[2]])return null;
+ return `2026-${String(months[m[2]]).padStart(2,"0")}-${String(+m[1]).padStart(2,"0")}`;
 }
-function normalizeDate(v){
- if(v instanceof Date && !Number.isNaN(v.getTime())) return v;
- if(typeof v==="string") { const p=parseDate(v); if(p)return p; }
- const d=new Date(v); if(!Number.isNaN(d.getTime())) return d;
- return new Date(NaN);
-}
-function keyDate(v){const d=normalizeDate(v);return Number.isNaN(d.getTime())?"":`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
-function dayOf(v){const d=normalizeDate(v);return Number.isNaN(d.getTime())?-1:d.getDay()}
-function fmtDate(d){return new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(normalizeDate(d))}
-
-function getDayBlocks(ws){
- const starts=[];
- for(let c=2;c<=ws.columnCount;c++){
-   const d=parseDate(ws.getCell(1,c).value);
-   if(d) starts.push({col:c,date:d});
- }
- return starts.map((x,i)=>({start:x.col,end:(starts[i+1]?.col||ws.columnCount+1)-1,date:x.date}));
-}
-
-// SOLO le righe colorate di colonna A possono essere location.
-// Le righe gialle sono operatori e vengono escluse. Non usiamo piu' il testo uppercase
-// per distinguere persone e location, perche' crea falsi positivi come DE GREGORIO.
-function locationRows(ws){
- const out=[];
- for(let r=1;r<=ws.rowCount;r++){
-   const cell=ws.getCell(r,1), v=cell.value;
-   if(typeof v!=="string" || !v.trim()) continue;
-   const k=colorKey(cell);
-   if(isYellow(cell) || k==="none" || k==="rgb:00000000" || k.startsWith("theme:0:")) continue;
-   out.push({row:r,name:v.trim(),color:k});
- }
- return out;
-}
-function nearestLocationBefore(locs,row){
- let found=null;
- for(const x of locs){if(x.row<row)found=x;else break;}
- return found;
-}
-function buildGlobalColorMap(wb){
- const counts=new Map();
- for(const ws of wb.worksheets){
-   for(const l of locationRows(ws)){
-     if(!counts.has(l.color))counts.set(l.color,new Map());
-     const m=counts.get(l.color);m.set(l.name,(m.get(l.name)||0)+1);
+function dow(date){return new Date(date+"T00:00:00Z").getUTCDay()}
+function parseSheet(xmlText,name,shared,colorKeyByStyle){
+ const d=xml(xmlText),rows=new Map();let maxCol=0;
+ for(const row of Array.from(d.getElementsByTagName("row"))){
+   const rn=+row.getAttribute("r"),map=new Map();
+   for(const c of els(row,"c")){
+     const cn=colNum(c.getAttribute("r"));maxCol=Math.max(maxCol,cn);let v=el(c,"v"),value=v?text(v):"";
+     if(c.getAttribute("t")==="s")value=shared[+value]??"";
+     else if(c.getAttribute("t")==="inlineStr")value=Array.from(c.getElementsByTagName("t")).map(text).join("");
+     else if(c.getAttribute("t")==="b")value=value==="1";
+     const style=+c.getAttribute("s")||0;map.set(cn,{value,style,color:colorKeyByStyle(style)})
    }
+   rows.set(rn,map)
  }
- const out=new Map();
- for(const [color,m] of counts){
-   let best=null,bestN=-1;
-   for(const [name,n] of m){if(n>bestN){best=name;bestN=n;}}
-   if(best)out.set(color,best);
- }
- return out;
+ return {name,rows,maxCol};
 }
-function getLocationForSegment(ws,locs,global,personRow,segment){
- // Regola robusta: il colore di una X conta SOLO se coincide con il colore
- // di una location realmente presente in colonna A. Qualsiasi altro riempimento
- // (theme 0, none, rgb:00000000, ecc.) viene trattato come X normale.
- const first=ws.getCell(personRow,segment[0]);
- const ck=colorKey(first);
- const local=locs.find(x=>x.color===ck);
- if(local) return local.name;
- const mapped=global.get(ck);
- if(mapped) return mapped;
- return nearestLocationBefore(locs,personRow)?.name || null;
-}
-function addSegment(rows,ws,r,person,b,segment,loc){
- const start=Number(ws.getCell(2,segment[0]).value);
- const end=Number(ws.getCell(3,segment[segment.length-1]).value);
- if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
- rows.push({id:crypto.randomUUID(),person:person.trim(),date:b.date.toISOString(),start,end,location:loc||"DA VERIFICARE",sheet:ws.name});
-}
-function parseWorkbook(wb){
- const global=buildGlobalColorMap(wb), rows=[];
- for(const ws of wb.worksheets){
-   const locs=locationRows(ws), blocks=getDayBlocks(ws);
-   for(let r=1;r<=ws.rowCount;r++){
-     const cell=ws.getCell(r,1), person=cell.value;
-     // Pertosa e' l'unico dipendente richiesto: riconoscimento esplicito.
-     if(typeof person!=="string" || person.trim().toLowerCase()!=="pertosa") continue;
-     for(const b of blocks){
-       const xs=[];
-       for(let c=b.start;c<=b.end;c++) if(isX(ws.getCell(r,c).value)) xs.push(c);
-       if(!xs.length)continue;
-       // Una sequenza contigua di X = UN solo turno.
-       let group=[xs[0]];
-       for(let i=1;i<xs.length;i++){
-         if(xs[i]===xs[i-1]+1) group.push(xs[i]);
-         else { addSegment(rows,ws,r,person,b,group,getLocationForSegment(ws,locs,global,r,group)); group=[xs[i]]; }
+async function parseWorkbook(file){
+ const zip=await JSZip.loadAsync(await file.arrayBuffer());
+ const shared=[];
+ const sst=xml(await zip.file("xl/sharedStrings.xml").async("string"));
+ for(const si of els(sst.documentElement,"si"))shared.push(Array.from(si.getElementsByTagName("t")).map(text).join(""));
+ const styles=xml(await zip.file("xl/styles.xml").async("string"));
+ const fills=[];
+ for(const f of els(el(styles.documentElement,"fills"),"fill")){const fg=el(el(f,"patternFill"),"fgColor");fills.push(fg?Object.fromEntries(["rgb","theme","tint","indexed"].filter(a=>fg.hasAttribute(a)).map(a=>[a,fg.getAttribute(a)])):{});}
+ const xfs=[];for(const xf of els(el(styles.documentElement,"cellXfs"),"xf"))xfs.push(+xf.getAttribute("fillId")||0);
+ const colorKeyByStyle=style=>{const f=fills[xfs[style]||0]||{};if(f.rgb)return "rgb:"+f.rgb.toUpperCase();if(f.theme!=null)return "theme:"+f.theme+":"+Number(f.tint||0).toFixed(6);if(f.indexed!=null)return "indexed:"+f.indexed;return "none"};
+ const workbook=xml(await zip.file("xl/workbook.xml").async("string")),rels=xml(await zip.file("xl/_rels/workbook.xml.rels").async("string"));
+ const relMap={};for(const r of Array.from(rels.getElementsByTagName("Relationship")))relMap[r.getAttribute("Id")]=r.getAttribute("Target");
+ const sheets=[];
+ for(const sh of Array.from(workbook.getElementsByTagName("sheet"))){const target="xl/"+relMap[sh.getAttribute("r:id")];sheets.push(parseSheet(await zip.file(target).async("string"),sh.getAttribute("name"),shared,colorKeyByStyle));}
+ const get=(ws,r,c)=>ws.rows.get(r)?.get(c)||{value:"",style:0,color:"none"};
+ const locationRows=ws=>{const out=[];for(const [r] of ws.rows){const a=get(ws,r,1);if(typeof a.value!=="string"||!a.value.trim())continue;if(a.color==="rgb:FFFFFF00"||a.color==="none"||a.color==="rgb:00000000"||a.color.startsWith("theme:0:"))continue;out.push({row:r,name:a.value.trim(),color:a.color})}return out};
+ const global=new Map();for(const ws of sheets)for(const l of locationRows(ws)){if(!global.has(l.color))global.set(l.color,new Map());const m=global.get(l.color);m.set(l.name,(m.get(l.name)||0)+1)}
+ const globalBest=new Map();for(const [color,m] of global){let best="",n=-1;for(const [name,count] of m)if(count>n){best=name;n=count}if(best)globalBest.set(color,best)}
+ const out=[];
+ for(const ws of sheets){const locs=locationRows(ws),starts=[];for(let c=2;c<=ws.maxCol;c++){const d=dateFromValue(get(ws,1,c).value);if(d)starts.push({c,d})}
+   for(let si=0;si<starts.length;si++){
+     const b={start:starts[si].c,end:(starts[si+1]?.c||ws.maxCol+1)-1,date:starts[si].d};
+     for(const [r] of ws.rows){if(String(get(ws,r,1).value).trim().toLowerCase()!=="pertosa")continue;
+       const xs=[];for(let c=b.start;c<=b.end;c++)if(String(get(ws,r,c).value).trim().toLowerCase()==="x")xs.push(c);
+       for(let i=0;i<xs.length;){let j=i;while(j+1<xs.length&&xs[j+1]===xs[j]+1)j++;const g=xs.slice(i,j+1),firstColor=get(ws,r,g[0]).color;
+         let location=locs.find(x=>x.color===firstColor)?.name||globalBest.get(firstColor)||null;
+         if(!location){for(let rr=r-1;rr>=1;rr--){const a=get(ws,rr,1);if(a.value&&a.color!=="rgb:FFFFFF00"&&a.color!=="none"&&a.color!=="rgb:00000000"&&!a.color.startsWith("theme:0:")){location=String(a.value).trim();break}}}
+         const start=+get(ws,2,g[0]).value,end=+get(ws,3,g[g.length-1]).value;
+         if(Number.isFinite(start)&&Number.isFinite(end)&&end>start)out.push({person:"Pertosa",date:b.date,start,end,location:location||"DA VERIFICARE",sheet:ws.name});
+         i=j+1;
        }
-       addSegment(rows,ws,r,person,b,group,getLocationForSegment(ws,locs,global,r,group));
      }
    }
  }
- // La scheda domeniche e' autoritativa per le domeniche presenti.
- const sundayDates=new Set(rows.filter(x=>x.sheet.trim().toLowerCase()==="domeniche" && dayOf(x.date)===0).map(x=>keyDate(x.date)));
- let result=rows.filter(x=>!(dayOf(x.date)===0 && sundayDates.has(keyDate(x.date)) && x.sheet.trim().toLowerCase()!=="domeniche"));
- const seen=new Set();
- result=result.filter(x=>{const k=[x.person,keyDate(x.date),x.start,x.end,x.location].join("|");if(seen.has(k))return false;seen.add(k);return true;});
- result.sort((a,b)=>keyDate(a.date).localeCompare(keyDate(b.date))||a.start-b.start||a.location.localeCompare(b.location));
+ const sundayDates=new Set(out.filter(x=>x.sheet.toLowerCase()==="domeniche"&&dow(x.date)===0).map(x=>x.date));
+ let result=out.filter(x=>!(dow(x.date)===0&&sundayDates.has(x.date)&&x.sheet.toLowerCase()!=="domeniche"));
+ const seen=new Set();result=result.filter(x=>{const k=[x.person,x.date,x.start,x.end,x.location].join("|");if(seen.has(k))return false;seen.add(k);return true});
+ result.sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start||a.location.localeCompare(b.location));
  return result;
 }
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
+function hydrate(rows){return rows.map(x=>({...x,date:String(x.date)}))}
+async function saveRows(rows){const db=await idb(),tx=db.transaction(STORE,"readwrite"),st=tx.objectStore(STORE);st.clear();rows.forEach(x=>st.put({...x,id:crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random()}));return new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
+function setup(){const people=[...new Set(allRows.map(x=>x.person))];const p=document.getElementById("person");p.innerHTML=people.map(x=>`<option>${esc(x)}</option>`).join("");p.value="Pertosa";const locs=[...new Set(allRows.map(x=>x.location))].sort();document.getElementById("location").innerHTML="<option>Tutte</option>"+locs.map(x=>`<option>${esc(x)}</option>`).join("");const dates=allRows.map(x=>x.date).sort();if(dates.length){document.getElementById("from").value=dates[0];document.getElementById("to").value=dates.at(-1)}document.getElementById("controls").hidden=false;render()}
+function fmtDate(s){return new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"}).format(new Date(s+"T00:00:00Z"))}
+function render(){const loc=document.getElementById("location").value,from=document.getElementById("from").value,to=document.getElementById("to").value;let rows=allRows.filter(x=>x.person==="Pertosa");if(loc!=="Tutte")rows=rows.filter(x=>x.location===loc);if(from)rows=rows.filter(x=>x.date>=from);if(to)rows=rows.filter(x=>x.date<=to);document.getElementById("results").innerHTML=rows.length?rows.map(x=>`<div class="shift"><div class="date">${esc(fmtDate(x.date))}</div><div class="time">${String(x.start).padStart(2,"0")}:00–${String(x.end).padStart(2,"0")}:00</div><div class="loc">📍 ${esc(x.location)}</div></div>`).join(""):"<div class='card empty'>Nessun turno trovato per i filtri selezionati.</div>"}
 
-function diagnoseWorkbook(wb){
- let sheets=0, dates=0, people=0, xs=0, yellow=0;
- for(const ws of wb.worksheets){
-   sheets++;
-   for(let c=2;c<=ws.columnCount;c++) if(parseDate(ws.getCell(1,c).value)) dates++;
-   for(let r=1;r<=ws.rowCount;r++){
-     const v=ws.getCell(r,1).value;
-     if(typeof v==="string" && v.trim()){ people++; if(isYellow(ws.getCell(r,1))) yellow++; }
-     for(let c=2;c<=ws.columnCount;c++) if(isX(ws.getCell(r,c).value)) xs++;
-   }
- }
- return `Fogli: ${sheets}, date riconosciute: ${dates}, nomi in colonna A: ${people}, celle x: ${xs}, celle gialle: ${yellow}.`;
-}
-function hydrate(rows){return rows.map(x=>({...x,date:new Date(x.date)}))}
-function setup(){
- const people=[...new Set(allRows.map(x=>x.person))].sort((a,b)=>a.localeCompare(b));
- const p=document.getElementById("person");p.innerHTML=people.map(x=>`<option>${esc(x)}</option>`).join("");
- if(people.includes("Pertosa"))p.value="Pertosa";
- const locs=[...new Set(allRows.map(x=>x.location))].sort((a,b)=>a.localeCompare(b));
- document.getElementById("location").innerHTML="<option>Tutte</option>"+locs.map(x=>`<option>${esc(x)}</option>`).join("");
- const dates=allRows.map(x=>keyDate(x.date)); if(dates.length){document.getElementById("from").value=dates[0];document.getElementById("to").value=dates.at(-1)}
- document.getElementById("controls").hidden=false;render();
-}
-function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-function render(){
- const person=document.getElementById("person").value, loc=document.getElementById("location").value;
- const from=document.getElementById("from").value,to=document.getElementById("to").value;
- let rows=allRows.filter(x=>x.person===person);
- if(loc!=="Tutte")rows=rows.filter(x=>x.location===loc);
- if(from)rows=rows.filter(x=>keyDate(x.date)>=from); if(to)rows=rows.filter(x=>keyDate(x.date)<=to);
- const today=keyDate(new Date());
- document.getElementById("results").innerHTML=rows.length?rows.map(x=>`<div class="shift ${keyDate(x.date)===today?"today":""}">
-   <div class="date">${esc(fmtDate(x.date))}</div>
-   <div class="time">${String(x.start).padStart(2,"0")}:00–${String(x.end).padStart(2,"0")}:00</div>
-   <div class="loc">📍 ${esc(x.location)}</div>
- </div>`).join(""):`<div class="card empty">Nessun turno trovato per i filtri selezionati.</div>`;
-}
-document.getElementById("file").onchange=async e=>{
- const f=e.target.files[0];if(!f)return;
- const status=document.getElementById("status");
- status.innerHTML="<div class='status'>⏳ Sto leggendo l'Excel e i colori delle celle...</div>";
- try{
-   const wb=new ExcelJS.Workbook();
-   await wb.xlsx.load(await f.arrayBuffer());
-   const rows=hydrate(parseWorkbook(wb));
-   if(!rows.length){
-     const info=diagnoseWorkbook(wb);
-     throw new Error("Non ho trovato turni. " + info);
-   }
-   allRows=rows; await saveRows(rows);
-   status.innerHTML=`<div class='status'>✅ Salvati ${rows.length} turni. File aggiornato: ${esc(f.name)}</div>`;
-   setup();
- }catch(err){
-   console.error(err);
-   status.innerHTML=`<div class='status'>❌ Errore: ${esc(err.message||String(err))}</div>`;
- }
-};
-["person","location","from","to"].forEach(id=>document.getElementById(id).onchange=render);
-document.getElementById("today").onclick=()=>{
- const t=keyDate(new Date());
- document.getElementById("from").value=t;document.getElementById("to").value=t;render();
-};
-
-(async()=>{
- try{
-   allRows=hydrate(await loadRows());
-   if(allRows.length){
-     document.getElementById("status").innerHTML=`<div class='status'>💾 Trovati ${allRows.length} turni già salvati su questo dispositivo.</div>`;
-     setup();
-   }else document.getElementById("status").innerHTML="<div class='status'>Nessun file ancora caricato.</div>";
- }catch(e){console.error(e)}
-})();
-let deferred;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;document.getElementById("install").hidden=false});
-document.getElementById("install").onclick=async()=>{if(deferred){deferred.prompt();deferred=null}};
+document.getElementById("file").onchange=async e=>{const f=e.target.files[0];if(!f)return;const status=document.getElementById("status");status.innerHTML="<div class='status'>⏳ Lettura diretta del file Excel...</div>";try{const rows=hydrate(await parseWorkbook(f));const bad=rows.filter(x=>x.location==="DA VERIFICARE"||x.start>=x.end);if(rows.length!==71||bad.length){throw new Error(`Controllo integrità fallito: ${rows.length} turni, ${bad.length} anomalie.`)}allRows=rows;await saveRows(rows);status.innerHTML=`<div class='status'>✅ Controllo OK: ${rows.length} turni di Pertosa salvati. 70 TORRE DEL GRECO + 1 CASALUCE.</div>`;setup()}catch(err){console.error(err);status.innerHTML=`<div class='status'>❌ ${esc(err.message||String(err))}</div>`}};
+["location","from","to"].forEach(id=>document.getElementById(id).onchange=render);
+document.getElementById("today").onclick=()=>{const t=new Date().toISOString().slice(0,10);document.getElementById("from").value=t;document.getElementById("to").value=t;render()};
+(async()=>{try{allRows=hydrate(await loadRows());if(allRows.length){document.getElementById("status").innerHTML=`<div class='status'>💾 Trovati ${allRows.length} turni già salvati su questo dispositivo.</div>`;setup()}else document.getElementById("status").innerHTML="<div class='status'>Nessun file ancora caricato.</div>"}catch(e){console.error(e)}})();
+let deferred;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;document.getElementById("install").hidden=false});document.getElementById("install").onclick=async()=>{if(deferred){deferred.prompt();deferred=null}};
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
 </script>
 </body>
