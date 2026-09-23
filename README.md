@@ -1,14 +1,13 @@
-# PWA Turni
+# Turni PWA v4
 
-Questa versione:
-- legge i colori dell'Excel con ExcelJS (non usa SheetJS per gli stili);
-- identifica i dipendenti tramite il giallo della colonna A;
-- identifica le location tramite il colore della colonna A;
-- usa la location precedente per X non colorate;
-- usa il colore della X per le X colorate;
-- tratta il foglio `domeniche` come fonte autorevole per le domeniche e rimuove duplicati;
-- salva i turni nel database locale del browser (IndexedDB), quindi dopo il primo caricamento non serve ricaricare l'Excel sullo stesso dispositivo/browser;
-- NON include ancora alcuna funzione calendario.
+Questa versione usa ExcelJS per leggere correttamente anche i colori/stili delle celle Excel.
 
-## Nota
-Questa è la versione locale/offline. Per la versione con database cloud gratuito (così i dati possono essere mantenuti anche cambiando dispositivo) va aggiunto Supabase con autenticazione e Row Level Security.
+## Deploy
+Carica `index.html`, `manifest.json` e `sw.js` nella root di un repository GitHub Pages.
+Non caricare l'Excel dei turni nel repository.
+
+## Dati
+I turni estratti vengono salvati in IndexedDB sul dispositivo/browser. Riaprendo la PWA sullo stesso dispositivo, i turni sono già disponibili.
+
+## Aggiornamento
+Quando carichi un nuovo Excel, l'archivio locale viene sostituito con i turni del nuovo file.

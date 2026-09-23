@@ -1,84 +1,248 @@
 <!doctype html>
 <html lang="it">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#111827"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
 <title>Turni</title>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
-:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}*{box-sizing:border-box}body{margin:0}.app{max-width:900px;margin:auto;padding:18px 14px 60px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}h1{font-size:25px;margin:0}.card{background:#fff;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0000000d}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:13px;color:#4b5563}select,input[type=file],input[type=date]{display:block;width:100%;margin-top:5px;padding:11px;border:1px solid #d1d5db;border-radius:11px;background:#fff;font:inherit;color:#111827}.button{display:inline-block;border:0;border-radius:11px;padding:11px 14px;background:#111827;color:#fff;font:inherit;cursor:pointer}.button.secondary{background:#e5e7eb;color:#111827}.small{font-size:13px;color:#6b7280}.status{padding:10px 12px;border-radius:10px;background:#f3f4f6;font-size:13px}.status.ok{background:#ecfdf5;color:#065f46}.status.err{background:#fef2f2;color:#991b1b}.shift{background:#fff;border-radius:16px;padding:14px 15px;margin:9px 0;box-shadow:0 2px 9px #0000000a;border-left:5px solid #111827}.date{font-weight:750}.time{font-size:23px;font-weight:800;margin-top:2px}.loc{font-size:17px;margin-top:3px}.empty{padding:25px;text-align:center;color:#6b7280}.hidden{display:none!important}.top-actions{display:flex;gap:8px;flex-wrap:wrap}.badge{font-size:12px;background:#e5e7eb;padding:5px 8px;border-radius:999px}@media(max-width:620px){.grid{grid-template-columns:1fr}h1{font-size:22px}}
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}
+body{margin:0}.app{max-width:900px;margin:auto;padding:18px 14px 70px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+h1{font-size:25px;margin:0}.card{background:#fff;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #0000000d}
+input,select,button{font:inherit}.file{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;background:#fff;box-sizing:border-box}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:14px;font-weight:650}
+select,input[type=date]{display:block;margin-top:5px;padding:10px;border:1px solid #d1d5db;border-radius:10px;width:100%;box-sizing:border-box;background:#fff}
+button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#fff;cursor:pointer}
+.secondary{background:#e5e7eb;color:#111827}.small{font-size:13px;color:#6b7280}
+.shift{padding:14px;border-radius:14px;background:#fff;margin:9px 0;box-shadow:0 2px 8px #0000000a}
+.date{font-weight:750;text-transform:capitalize}.time{font-size:23px;font-weight:850;margin-top:2px}.loc{font-size:17px;margin-top:4px}
+.today{border:2px solid #111827}.status{padding:10px;border-radius:10px;background:#f9fafb;font-size:14px}
+.empty{padding:25px;text-align:center;color:#6b7280}
+@media(max-width:600px){.grid{grid-template-columns:1fr}h1{font-size:22px}}
 </style>
 </head>
 <body>
 <div class="app">
-<header><div><h1>📅 I miei turni</h1><div class="small" id="lastSaved"></div></div><button id="installBtn" class="button secondary hidden">Installa</button></header>
-<div class="card" id="uploadCard">
-<strong>Aggiorna turni</strong>
-<p class="small">La prima volta carica l'Excel. Dopo il salvataggio, quando riapri l'app i turni restano disponibili senza ricaricare il file.</p>
-<input id="file" type="file" accept=".xlsx,.xlsm">
-<div id="status" class="status" style="margin-top:10px">Nessun file caricato in questa sessione.</div>
+<header><h1>📅 I miei turni</h1><button id="install" class="secondary" hidden>Installa</button></header>
+
+<div class="card">
+  <b>Aggiorna turni</b>
+  <input id="file" class="file" type="file" accept=".xlsx,.xlsm">
+  <p class="small">Il file viene elaborato direttamente nel browser. Dopo il primo caricamento i turni restano salvati su questo dispositivo.</p>
+  <div id="status"></div>
 </div>
-<div id="controls" class="card hidden">
-<div class="grid">
-<label>Persona<select id="person"></select></label>
-<label>Location<select id="location"><option>Tutte</option></select></label>
-<label>Da<input id="from" type="date"></label>
-<label>A<input id="to" type="date"></label>
+
+<div id="controls" class="card" hidden>
+  <div class="grid">
+    <label>Persona<select id="person"></select></label>
+    <label>Location<select id="location"><option>Tutte</option></select></label>
+    <label>Da<input id="from" type="date"></label>
+    <label>A<input id="to" type="date"></label>
+  </div>
+  <div style="margin-top:12px"><button id="today">📍 Vai a oggi</button></div>
 </div>
-<div class="top-actions" style="margin-top:12px"><button id="today" class="button secondary">Oggi</button><button id="reload" class="button secondary">Ricarica dati salvati</button><button id="clear" class="button secondary">Cancella dati locali</button></div>
-</div>
-<div id="summary" class="card hidden"></div>
 <div id="results"></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
 <script>
-const DB_NAME='turni-pwa-db', DB_VERSION=1, STORE='data';
-let allRows=[], db=null, deferredPrompt=null;
-const months={gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12,gen:1,feb:2,mar:3,apr:4,mag:5,giu:6,lug:7,ago:8,set:9,ott:10,nov:11,dic:12};
-const weekdays=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
-function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>{db=r.result;res(db)};r.onerror=()=>rej(r.error)})}
-function saveRows(rows){return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put({rows, savedAt:new Date().toISOString()},'turni');tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
-function loadRows(){return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get('turni');r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})}
-function clearRows(){return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete('turni');tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
-function excelText(v){if(v==null)return '';if(typeof v==='object'&&v.richText)return v.richText.map(x=>x.text).join('');return String(v)}
-function fillKey(cell){const f=cell?.fill;if(!f||f.type!=='pattern'||f.pattern!=='solid')return 'none';const fg=f.fgColor||{};if(fg.type==='argb')return String(fg.argb||'').toUpperCase();if(fg.type==='rgb')return String(fg.rgb||'').toUpperCase();if(fg.type==='theme')return 'theme:'+fg.theme;return fg.type+':'+String(fg.indexed??'')}
-function isYellow(cell){return fillKey(cell)==='FFFFFF00'||fillKey(cell)==='FFFF00'}
-function dateFrom(v){if(v instanceof Date&&!isNaN(v))return new Date(v.getFullYear(),v.getMonth(),v.getDate());const s=excelText(v).trim().toLowerCase();const m=s.match(/(\d{1,2})\s+([a-zàèéìòù]+)/);if(!m)return null;const mo=months[m[2]];if(!mo)return null;return new Date(2026,mo-1,+m[1])}
-function dayBlocks(ws){const out=[];let starts=[];for(let c=2;c<=ws.columnCount;c++){const d=dateFrom(ws.getRow(1).getCell(c).value);if(d)starts.push({c,d})}for(let i=0;i<starts.length;i++)out.push({sc:starts[i].c,ec:(starts[i+1]?.c||ws.columnCount+1)-1,date:starts[i].d});return out}
-function locationRows(ws){const out=[];for(let r=1;r<=ws.rowCount;r++){const cell=ws.getRow(r).getCell(1),v=excelText(cell.value).trim();if(!v||isYellow(cell))continue;if(v.toUpperCase()===v)out.push({r,name:v,color:fillKey(cell)})}return out}
-function nearestLocation(locs,r){let x=locs.filter(a=>a.r<r);return x.length?x[x.length-1]:null}
-function isX(cell){return excelText(cell.value).trim().toLowerCase()==='x'}
-function defaultX(cell){const k=fillKey(cell);return k==='none'||k==='00000000'||k==='FFFFFFFF'}
-async function parseWorkbook(file){
- const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
- const colorMap={};
- for(const ws of wb.worksheets){for(const l of locationRows(ws)){colorMap[l.color]??={};colorMap[l.color][l.name]=(colorMap[l.color][l.name]||0)+1}}
- const globalColor={};for(const [c,n] of Object.entries(colorMap))globalColor[c]=Object.entries(n).sort((a,b)=>b[1]-a[1])[0][0];
- const rows=[];
- for(const ws of wb.worksheets){const locs=locationRows(ws), blocks=dayBlocks(ws);for(let r=1;r<=ws.rowCount;r++){
-  const pc=ws.getRow(r).getCell(1), person=excelText(pc.value).trim();if(!person||!isYellow(pc))continue;
-  for(const b of blocks){let xs=[];for(let c=b.sc;c<=b.ec;c++)if(isX(ws.getRow(r).getCell(c)))xs.push(c);if(!xs.length)continue;
-   const groups=[];let g=[xs[0]];for(let i=1;i<xs.length;i++){if(xs[i]===xs[i-1]+1)g.push(xs[i]);else{groups.push(g);g=[xs[i]]}}groups.push(g);
-   for(const group of groups){let seg=[group[0]],loc=null;const getLoc=c=>{const cell=ws.getRow(r).getCell(c),k=fillKey(cell);if(defaultX(cell))return nearestLocation(locs,r)?.name||null;return locs.find(z=>z.color===k)?.name||globalColor[k]||null};loc=getLoc(group[0]);for(let i=1;i<group.length;i++){const l=getLoc(group[i]);if(l===loc)seg.push(group[i]);else{add(seg,loc,b,ws.name,ws,r);seg=[group[i]];loc=l}}add(seg,loc,b,ws.name,ws,r);
-   }
-  }
- }}
- // The dedicated domeniche sheet is authoritative for Sundays and removes duplicates from weekly sheets.
- const dedicated=new Set(rows.filter(x=>x.sheet.toLowerCase()==='domeniche'&&x.date.getDay()===0).map(x=>keyDate(x.date)));
- let filtered=rows.filter(x=>!(x.date.getDay()===0&&dedicated.has(keyDate(x.date))&&x.sheet.toLowerCase()!=='domeniche'));
- const seen=new Set();filtered=filtered.filter(x=>{const k=[x.person,keyDate(x.date),x.start,x.end,x.location].join('|');if(seen.has(k))return false;seen.add(k);return true});
- filtered.sort((a,b)=>a.date-b.date||a.start-b.start||a.person.localeCompare(b.person));return filtered;
- function add(seg,loc,b,sheet,ws,r){const start=Number(ws.getRow(2).getCell(seg[0]).value),end=Number(ws.getRow(3).getCell(seg[seg.length-1]).value);rows.push({person:excelText(ws.getRow(r).getCell(1).value).trim(),date:b.date.toISOString(),start,end,location:loc||'DA VERIFICARE',sheet})}
+const DB="turni-db-v4", STORE="shifts", YEAR=2026;
+let allRows=[];
+
+function idb(){
+ return new Promise((resolve,reject)=>{
+  const r=indexedDB.open(DB,1);
+  r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"})};
+  r.onsuccess=()=>resolve(r.result); r.onerror=()=>reject(r.error);
+ });
 }
-function keyDate(x){return new Date(x.date).toISOString().slice(0,10)}
-function dateObj(x){return new Date(x.date)}
-function fmtDate(x){const d=dateObj(x);return weekdays[d.getDay()]+' '+String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()}
-function setup(){const people=[...new Set(allRows.map(x=>x.person))].sort((a,b)=>a.localeCompare(b));const p=document.getElementById('person');p.innerHTML=people.map(x=>`<option>${esc(x)}</option>`).join('');if(people.includes('Pertosa'))p.value='Pertosa';const locs=[...new Set(allRows.map(x=>x.location))].sort((a,b)=>a.localeCompare(b));document.getElementById('location').innerHTML='<option>Tutte</option>'+locs.map(x=>`<option>${esc(x)}</option>`).join('');const dates=allRows.map(keyDate).sort();document.getElementById('from').value=dates[0];document.getElementById('to').value=dates.at(-1);document.getElementById('controls').classList.remove('hidden');render()}
-function render(){if(!allRows.length)return;const person=document.getElementById('person').value,loc=document.getElementById('location').value,from=document.getElementById('from').value,to=document.getElementById('to').value;let rows=allRows.filter(x=>x.person===person&&(!from||keyDate(x)>=from)&&(!to||keyDate(x)<=to)&&(loc==='Tutte'||x.location===loc));const today=new Date();today.setHours(0,0,0,0);const todayRows=rows.filter(x=>keyDate(x)===today.toISOString().slice(0,10));document.getElementById('summary').classList.remove('hidden');document.getElementById('summary').innerHTML=`<strong>${esc(person)}</strong> · ${rows.length} turni nel periodo${todayRows.length?` · <span class="badge">Oggi: ${todayRows.map(x=>x.start+':00–'+x.end+':00').join(', ')}</span>`:''}`;document.getElementById('results').innerHTML=rows.length?rows.map(x=>`<div class="shift"><div class="date">${fmtDate(x)}</div><div class="time">${String(x.start).padStart(2,'0')}:00–${String(x.end).padStart(2,'0')}:00</div><div class="loc">📍 ${esc(x.location)}</div></div>`).join(''):'<div class="card empty">Nessun turno nel periodo selezionato.</div>'}
-function esc(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-async function useSaved(){const d=await loadRows();if(!d||!d.rows?.length)return false;allRows=d.rows;document.getElementById('lastSaved').textContent='Dati salvati: '+new Date(d.savedAt).toLocaleString('it-IT');document.getElementById('status').textContent='Turni salvati disponibili anche senza ricaricare l’Excel.';document.getElementById('status').className='status ok';setup();return true}
-document.getElementById('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;const st=document.getElementById('status');st.textContent='Sto leggendo l’Excel…';st.className='status';try{allRows=await parseWorkbook(f);if(!allRows.length)throw new Error('Non ho trovato turni. Controlla la struttura del file.');await saveRows(allRows);document.getElementById('lastSaved').textContent='Dati salvati: '+new Date().toLocaleString('it-IT');st.textContent=`Importazione completata: ${allRows.length} turni salvati sul dispositivo.`;st.className='status ok';setup()}catch(err){console.error(err);st.textContent='Errore: '+err.message;st.className='status err'}};
-['person','location','from','to'].forEach(id=>document.getElementById(id).onchange=render);document.getElementById('today').onclick=()=>{const d=new Date().toISOString().slice(0,10);document.getElementById('from').value=d;document.getElementById('to').value=d;render()};document.getElementById('reload').onclick=useSaved;document.getElementById('clear').onclick=async()=>{if(confirm('Cancellare i turni salvati su questo dispositivo?')){await clearRows();allRows=[];document.getElementById('controls').classList.add('hidden');document.getElementById('summary').classList.add('hidden');document.getElementById('results').innerHTML='';document.getElementById('lastSaved').textContent=''}};
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBtn').classList.remove('hidden')});document.getElementById('installBtn').onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null}};
-(async()=>{await openDB();await useSaved();})();
+async function saveRows(rows){
+ const db=await idb(), tx=db.transaction(STORE,"readwrite"), st=tx.objectStore(STORE);
+ st.clear(); rows.forEach(x=>st.put(x));
+ return new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});
+}
+async function loadRows(){
+ const db=await idb(), tx=db.transaction(STORE,"readonly"), req=tx.objectStore(STORE).getAll();
+ return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});
+}
+
+function rgb(fill){
+ if(!fill || fill.type!=="pattern") return "none";
+ const c=fill.fgColor||{};
+ if(c.type==="rgb" && c.argb) return c.argb.toUpperCase();
+ if(c.type==="theme" && c.theme!=null) return "theme:"+c.theme+":"+Number(c.tint||0).toFixed(6);
+ if(c.type==="indexed" && c.indexed!=null) return "indexed:"+c.indexed;
+ return "none";
+}
+function isYellow(cell){
+ return rgb(cell.fill)==="FFFFFF00";
+}
+function isDefaultX(cell){
+ const x=rgb(cell.fill);
+ return x==="none" || x==="00000000" || x.startsWith("theme:0:");
+}
+function isX(v){return String(v??"").trim().toLowerCase()==="x"}
+
+function parseDate(v){
+ if(v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(),v.getMonth(),v.getDate());
+ if(typeof v==="number"){
+   const d=new Date(Math.round((v-25569)*86400*1000));
+   return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
+ }
+ const s=String(v??"").trim().toLowerCase();
+ const months={gennaio:0,febbraio:1,marzo:2,aprile:3,maggio:4,giugno:5,luglio:6,agosto:7,settembre:8,ottobre:9,novembre:10,dicembre:11};
+ const m=s.match(/(\d{1,2})\s+([a-zàèéìòù]+)/);
+ if(m && months[m[2]]!==undefined)return new Date(YEAR,months[m[2]],+m[1]);
+ return null;
+}
+function keyDate(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")}
+function fmtDate(d){return new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
+
+function getDayBlocks(ws){
+ const starts=[];
+ for(let c=2;c<=ws.columnCount;c++){
+   const v=ws.getCell(1,c).value;
+   if(v!==null && v!==undefined && String(v).trim()!==""){
+     const d=parseDate(v);
+     if(d)starts.push({col:c,date:d});
+   }
+ }
+ return starts.map((s,i)=>({start:s.col,end:(starts[i+1]?.col||ws.columnCount+1)-1,date:s.date}));
+}
+function locationRows(ws){
+ const a=[];
+ for(let r=1;r<=ws.rowCount;r++){
+   const cell=ws.getCell(r,1), v=cell.value;
+   if(typeof v!=="string" || !v.trim() || isYellow(cell))continue;
+   const name=v.trim();
+   if(name===name.toUpperCase())a.push({row:r,name,color:rgb(cell.fill)});
+ }
+ return a;
+}
+function nearestPrevious(locs,row){
+ let x=null; for(const l of locs)if(l.row<row)x=l; return x;
+}
+function buildGlobalColorMap(wb){
+ const map={};
+ for(const ws of wb.worksheets)for(const l of locationRows(ws)){
+   map[l.color]??={}; map[l.color][l.name]=(map[l.color][l.name]||0)+1;
+ }
+ const out={};
+ for(const [color,names] of Object.entries(map))
+   out[color]=Object.entries(names).sort((a,b)=>b[1]-a[1])[0][0];
+ return out;
+}
+function parseWorkbook(wb){
+ const global=buildGlobalColorMap(wb), rows=[];
+ for(const ws of wb.worksheets){
+   const locs=locationRows(ws), blocks=getDayBlocks(ws);
+   for(let r=1;r<=ws.rowCount;r++){
+     const personCell=ws.getCell(r,1), person=personCell.value;
+     if(typeof person!=="string" || !person.trim() || !isYellow(personCell))continue;
+     for(const b of blocks){
+       const xs=[];
+       for(let c=b.start;c<=b.end;c++)if(isX(ws.getCell(r,c).value))xs.push(c);
+       if(!xs.length)continue;
+       const groups=[[xs[0]]];
+       for(let i=1;i<xs.length;i++){
+         if(xs[i]===xs[i-1]+1)groups.at(-1).push(xs[i]); else groups.push([xs[i]]);
+       }
+       for(const group of groups){
+         let segment=[group[0]];
+         const getLoc=c=>{
+           const x=ws.getCell(r,c), col=rgb(x.fill);
+           if(isDefaultX(x)) return nearestPrevious(locs,r)?.name || null;
+           return locs.find(z=>z.color===col)?.name || global[col] || null;
+         };
+         let loc=getLoc(group[0]);
+         for(let i=1;i<group.length;i++){
+           const next=getLoc(group[i]);
+           if(next===loc)segment.push(group[i]);
+           else{
+             addSegment(rows,ws,r,person,b,segment,loc);
+             segment=[group[i]];loc=next;
+           }
+         }
+         addSegment(rows,ws,r,person,b,segment,loc);
+       }
+     }
+   }
+ }
+ // For Sundays, the dedicated "domeniche" sheet is authoritative.
+ const sundayDates=new Set(rows.filter(x=>x.sheet.toLowerCase()==="domeniche"&&x.date.getDay()===0).map(x=>keyDate(x.date)));
+ let result=rows.filter(x=>!(x.date.getDay()===0&&sundayDates.has(keyDate(x.date))&&x.sheet.toLowerCase()!=="domeniche"));
+ const seen=new Set();
+ result=result.filter(x=>{const k=[x.person,keyDate(x.date),x.start,x.end,x.location].join("|");if(seen.has(k))return false;seen.add(k);return true});
+ result.sort((a,b)=>a.date-b.date||a.start-b.start||a.location.localeCompare(b.location));
+ return result;
+}
+function addSegment(rows,ws,r,person,b,segment,loc){
+ const start=Number(ws.getCell(2,segment[0]).value), end=Number(ws.getCell(3,segment.at(-1)).value);
+ if(!Number.isFinite(start)||!Number.isFinite(end))return;
+ rows.push({id:crypto.randomUUID(),person:person.trim(),date:b.date.toISOString(),start,end,location:loc||"DA VERIFICARE",sheet:ws.name});
+}
+
+function hydrate(rows){return rows.map(x=>({...x,date:new Date(x.date)}))}
+function setup(){
+ const people=[...new Set(allRows.map(x=>x.person))].sort((a,b)=>a.localeCompare(b));
+ const p=document.getElementById("person");p.innerHTML=people.map(x=>`<option>${esc(x)}</option>`).join("");
+ if(people.includes("Pertosa"))p.value="Pertosa";
+ const locs=[...new Set(allRows.map(x=>x.location))].sort((a,b)=>a.localeCompare(b));
+ document.getElementById("location").innerHTML="<option>Tutte</option>"+locs.map(x=>`<option>${esc(x)}</option>`).join("");
+ const dates=allRows.map(x=>keyDate(x.date)); if(dates.length){document.getElementById("from").value=dates[0];document.getElementById("to").value=dates.at(-1)}
+ document.getElementById("controls").hidden=false;render();
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function render(){
+ const person=document.getElementById("person").value, loc=document.getElementById("location").value;
+ const from=document.getElementById("from").value,to=document.getElementById("to").value;
+ let rows=allRows.filter(x=>x.person===person);
+ if(loc!=="Tutte")rows=rows.filter(x=>x.location===loc);
+ if(from)rows=rows.filter(x=>keyDate(x.date)>=from); if(to)rows=rows.filter(x=>keyDate(x.date)<=to);
+ const today=keyDate(new Date());
+ document.getElementById("results").innerHTML=rows.length?rows.map(x=>`<div class="shift ${keyDate(x.date)===today?"today":""}">
+   <div class="date">${esc(fmtDate(x.date))}</div>
+   <div class="time">${String(x.start).padStart(2,"0")}:00–${String(x.end).padStart(2,"0")}:00</div>
+   <div class="loc">📍 ${esc(x.location)}</div>
+ </div>`).join(""):`<div class="card empty">Nessun turno trovato per i filtri selezionati.</div>`;
+}
+document.getElementById("file").onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ const status=document.getElementById("status");
+ status.innerHTML="<div class='status'>⏳ Sto leggendo l'Excel e i colori delle celle...</div>";
+ try{
+   const wb=new ExcelJS.Workbook();
+   await wb.xlsx.load(await f.arrayBuffer());
+   const rows=hydrate(parseWorkbook(wb));
+   if(!rows.length)throw new Error("Non ho trovato turni. Controlla la struttura del file.");
+   allRows=rows; await saveRows(rows);
+   status.innerHTML=`<div class='status'>✅ Salvati ${rows.length} turni. File aggiornato: ${esc(f.name)}</div>`;
+   setup();
+ }catch(err){
+   console.error(err);
+   status.innerHTML=`<div class='status'>❌ Errore: ${esc(err.message||String(err))}</div>`;
+ }
+};
+["person","location","from","to"].forEach(id=>document.getElementById(id).onchange=render);
+document.getElementById("today").onclick=()=>{
+ const t=keyDate(new Date());
+ document.getElementById("from").value=t;document.getElementById("to").value=t;render();
+};
+
+(async()=>{
+ try{
+   allRows=hydrate(await loadRows());
+   if(allRows.length){
+     document.getElementById("status").innerHTML=`<div class='status'>💾 Trovati ${allRows.length} turni già salvati su questo dispositivo.</div>`;
+     setup();
+   }else document.getElementById("status").innerHTML="<div class='status'>Nessun file ancora caricato.</div>";
+ }catch(e){console.error(e)}
+})();
+let deferred;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;document.getElementById("install").hidden=false});
+document.getElementById("install").onclick=async()=>{if(deferred){deferred.prompt();deferred=null}};
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
 </script>
-</body></html>
+</body>
+</html>

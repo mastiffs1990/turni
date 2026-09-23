@@ -1,1 +1,8 @@
-{"name":"I miei turni","short_name":"Turni","start_url":"./","display":"standalone","background_color":"#f3f4f6","theme_color":"#111827","description":"Visualizza i turni di lavoro dal file Excel.","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{
+"name":"I miei turni",
+"short_name":"Turni",
+"start_url":"./",
+"display":"standalone",
+"background_color":"#f3f4f6",
+"theme_color":"#111827"
+}
