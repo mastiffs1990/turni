@@ -174,11 +174,11 @@ function parseWorkbook(wb){
    }
  }
  // For Sundays, the dedicated "domeniche" sheet is authoritative.
- const sundayDates=new Set(rows.filter(x=>x.sheet.toLowerCase()==="domeniche"&&x.date.getDay()===0).map(x=>keyDate(x.date)));
- let result=rows.filter(x=>!(x.date.getDay()===0&&sundayDates.has(keyDate(x.date))&&x.sheet.toLowerCase()!=="domeniche"));
+ const sundayDates=new Set(rows.filter(x=>x.sheet.toLowerCase()==="domeniche"&&new Date(x.date).getDay()===0).map(x=>keyDate(new Date(x.date))));
+ let result=rows.filter(x=>!(new Date(x.date).getDay()===0&&sundayDates.has(keyDate(new Date(x.date)))&&x.sheet.toLowerCase()!=="domeniche"));
  const seen=new Set();
  result=result.filter(x=>{const k=[x.person,keyDate(x.date),x.start,x.end,x.location].join("|");if(seen.has(k))return false;seen.add(k);return true});
- result.sort((a,b)=>a.date-b.date||a.start-b.start||a.location.localeCompare(b.location));
+ result.sort((a,b)=>new Date(a.date)-new Date(b.date)||a.start-b.start||a.location.localeCompare(b.location));
  return result;
 }
 function addSegment(rows,ws,r,person,b,segment,loc){
