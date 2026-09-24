@@ -23,12 +23,18 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </head>
 <body>
 <div class="app">
-<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v13.0.0 DEFINITIVA</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
+<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v14.0.0</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
 <div class="card">
   <b>Aggiorna turni</b>
   <input id="file" class="file" type="file" accept=".xlsx,.xlsm">
   <p class="small">Il file viene elaborato direttamente nel browser. Dopo il primo caricamento i turni restano salvati su questo dispositivo.</p>
   <div id="status"></div>
+</div>
+<div class="card">
+  <b>Notifiche</b>
+  <p class="small">Il promemoria automatico richiede un servizio push esterno per poter arrivare anche quando l'app è completamente chiusa. La PWA è predisposta, ma non attivo una falsa notifica locale che funzionerebbe solo mentre l'app è aperta.</p>
+  <button id="notify" class="secondary">🔔 Abilita notifiche</button>
+  <div id="notifyStatus" class="small" style="margin-top:8px"></div>
 </div>
 <div id="controls" class="card" hidden>
   <div class="grid">
@@ -43,11 +49,26 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </div>
 <script src="jszip.min.js"></script>
 <script>
-const DB="turni-db-v13", STORE="shifts", VERSION="v13.0.0 DEFINITIVA";
+const DB="turni-db-v13", STORE="shifts", VERSION="v14.0.0";
 let allRows=[];
 function idb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-async function saveRows(rows){const db=await idb(),tx=db.transaction(STORE,"readwrite"),st=tx.objectStore(STORE);st.clear();rows.forEach(x=>st.put({...x,id:crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random()}));return new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
-async function loadRows(){const db=await idb(),tx=db.transaction(STORE,"readonly"),req=tx.objectStore(STORE).getAll();return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)})}
+async function saveRows(rows){
+  const payload=JSON.stringify(rows);
+  localStorage.setItem(BACKUP_KEY,payload);
+  try{
+    const db=await idb(),tx=db.transaction(STORE,"readwrite"),st=tx.objectStore(STORE);
+    st.clear(); rows.forEach(x=>st.put({...x,id:crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random()}));
+    await new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});
+  }catch(e){console.warn("IndexedDB non disponibile, uso backup locale",e)}
+}
+async function loadRows(){
+  try{
+    const db=await idb(),tx=db.transaction(STORE,"readonly"),req=tx.objectStore(STORE).getAll();
+    const rows=await new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});
+    if(rows.length)return rows;
+  }catch(e){console.warn("Lettura IndexedDB fallita",e)}
+  try{return JSON.parse(localStorage.getItem(BACKUP_KEY)||"[]")}catch(e){return []}
+}
 const text=n=>n?.textContent||"";
 const els=(p,n)=>Array.from(p?.childNodes||[]).filter(x=>x.nodeType===1&&(x.localName||x.nodeName)===n);
 const el=(p,n)=>els(p,n)[0]||null;
@@ -119,8 +140,9 @@ async function parseWorkbook(file){
 }
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
 function hydrate(rows){return rows.map(x=>({...x,date:String(x.date)}))}
-async function saveRows(rows){const db=await idb(),tx=db.transaction(STORE,"readwrite"),st=tx.objectStore(STORE);st.clear();rows.forEach(x=>st.put({...x,id:crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random()}));return new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
-function setup(){const people=[...new Set(allRows.map(x=>x.person))];const p=document.getElementById("person");p.innerHTML=people.map(x=>`<option>${esc(x)}</option>`).join("");p.value="Pertosa";const locs=[...new Set(allRows.map(x=>x.location))].sort();document.getElementById("location").innerHTML="<option>Tutte</option>"+locs.map(x=>`<option>${esc(x)}</option>`).join("");const dates=allRows.map(x=>x.date).sort();if(dates.length){document.getElementById("from").value=dates[0];document.getElementById("to").value=dates.at(-1)}document.getElementById("controls").hidden=false;render()}
+function setup(){const people=[...new Set(allRows.map(x=>x.person))];const p=document.getElementById("person");p.innerHTML=people.map(x=>`<option>${esc(x)}</option>`).join("");p.value="Pertosa";const locs=[...new Set(allRows.map(x=>x.location))].sort();document.getElementById("location").innerHTML="<option>Tutte</option>"+locs.map(x=>`<option>${esc(x)}</option>`).join("");setCurrentWeek();document.getElementById("controls").hidden=false;render()}
+function isoLocal(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
+function setCurrentWeek(){const d=new Date();const day=d.getDay()||7;const mon=new Date(d);mon.setDate(d.getDate()-day+1);const sun=new Date(mon);sun.setDate(mon.getDate()+6);document.getElementById("from").value=isoLocal(mon);document.getElementById("to").value=isoLocal(sun)}
 function fmtDate(s){return new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"}).format(new Date(s+"T00:00:00Z"))}
 function render(){const loc=document.getElementById("location").value,from=document.getElementById("from").value,to=document.getElementById("to").value;let rows=allRows.filter(x=>x.person==="Pertosa");if(loc!=="Tutte")rows=rows.filter(x=>x.location===loc);if(from)rows=rows.filter(x=>x.date>=from);if(to)rows=rows.filter(x=>x.date<=to);document.getElementById("results").innerHTML=rows.length?rows.map(x=>`<div class="shift"><div class="date">${esc(fmtDate(x.date))}</div><div class="time">${String(x.start).padStart(2,"0")}:00–${String(x.end).padStart(2,"0")}:00</div><div class="loc">📍 ${esc(x.location)}</div></div>`).join(""):"<div class='card empty'>Nessun turno trovato per i filtri selezionati.</div>"}
 
@@ -129,6 +151,12 @@ document.getElementById("file").onchange=async e=>{const f=e.target.files[0];if(
 document.getElementById("today").onclick=()=>{const t=new Date().toISOString().slice(0,10);document.getElementById("from").value=t;document.getElementById("to").value=t;render()};
 (async()=>{try{allRows=hydrate(await loadRows());if(allRows.length){document.getElementById("status").innerHTML=`<div class='status'>💾 Trovati ${allRows.length} turni già salvati su questo dispositivo.</div>`;setup()}else document.getElementById("status").innerHTML="<div class='status'>Nessun file ancora caricato.</div>"}catch(e){console.error(e)}})();
 let deferred;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;document.getElementById("install").hidden=false});document.getElementById("install").onclick=async()=>{if(deferred){deferred.prompt();deferred=null}};
+document.getElementById("notify").onclick=async()=>{
+  const out=document.getElementById("notifyStatus");
+  if(!("Notification" in window)){out.textContent="Questo browser non supporta le notifiche web.";return}
+  const p=await Notification.requestPermission();
+  out.textContent=p==="granted"?"✅ Permesso notifiche concesso. Per il promemoria delle 17:00 serve ora collegare un servizio push al sito.":"Permesso notifiche non concesso.";
+};
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
 </script>
 </body>
