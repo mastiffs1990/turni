@@ -1,5 +1,7 @@
-# Turni PWA v13.0.0 DEFINITIVA
+# Turni PWA v15.0.0
 
-Parser locale senza CDN: legge direttamente il contenitore XLSX, gli stili e i colori delle celle.
+Correzione salvataggio locale: definita la chiave di backup `turni-backup-v15`; IndexedDB e localStorage sono indipendenti e il fallback non blocca il salvataggio. Il database e la cache hanno nomi nuovi per evitare residui delle versioni precedenti.
 
-Testato sul file di riferimento: 71 turni di Pertosa, 70 Torre del Greco e 1 Casaluce, senza `DA VERIFICARE` e con sequenze consecutive raggruppate in un unico turno.
+La visualizzazione iniziale resta limitata alla settimana corrente (lunedì-domenica).
+
+Le notifiche push sono predisposte nel service worker ma non sono ancora collegate a un provider: occorrono l'ID app del provider e un meccanismo server-side per inviare i promemoria programmati.

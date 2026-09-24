@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
-<title>Turni PWA v13</title>
+<title>Turni PWA v15</title>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}
 body{margin:0}.app{max-width:900px;margin:auto;padding:18px 14px 70px}
@@ -23,7 +23,7 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </head>
 <body>
 <div class="app">
-<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v14.0.0</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
+<header><div><h1>📅 I miei turni</h1><div style="font-size:12px;color:#6b7280;margin-top:3px">Versione app: <b>v15.0.0</b></div></div><button id="install" class="secondary" hidden>Installa</button></header>
 <div class="card">
   <b>Aggiorna turni</b>
   <input id="file" class="file" type="file" accept=".xlsx,.xlsm">
@@ -32,7 +32,7 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </div>
 <div class="card">
   <b>Notifiche</b>
-  <p class="small">Il promemoria automatico richiede un servizio push esterno per poter arrivare anche quando l'app è completamente chiusa. La PWA è predisposta, ma non attivo una falsa notifica locale che funzionerebbe solo mentre l'app è aperta.</p>
+  <p class="small">Le notifiche push richiedono la configurazione di un provider. Il collegamento verrà attivato dopo aver inserito l’ID app del servizio e configurato l’invio programmato.</p>
   <button id="notify" class="secondary">🔔 Abilita notifiche</button>
   <div id="notifyStatus" class="small" style="margin-top:8px"></div>
 </div>
@@ -49,12 +49,12 @@ button{border:0;border-radius:11px;padding:10px 13px;background:#111827;color:#f
 </div>
 <script src="jszip.min.js"></script>
 <script>
-const DB="turni-db-v13", STORE="shifts", VERSION="v14.0.0";
+const DB="turni-db-v15", STORE="shifts", BACKUP_KEY="turni-backup-v15", VERSION="v15.0.0";
 let allRows=[];
 function idb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 async function saveRows(rows){
   const payload=JSON.stringify(rows);
-  localStorage.setItem(BACKUP_KEY,payload);
+  try{localStorage.setItem(BACKUP_KEY,payload)}catch(e){console.warn("Backup localStorage non disponibile",e)}
   try{
     const db=await idb(),tx=db.transaction(STORE,"readwrite"),st=tx.objectStore(STORE);
     st.clear(); rows.forEach(x=>st.put({...x,id:crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random()}));
